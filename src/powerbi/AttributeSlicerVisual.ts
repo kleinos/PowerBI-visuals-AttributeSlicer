@@ -407,13 +407,30 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
                              "horizontal": state.horizontal,
                          },
                      }
-                 ],
+,                 ],
              };
 
              let filter: data.SemanticFilter;
              if (state.selectedItems && state.selectedItems.length) {
                  filter = data.Selector.filterFromSelector(state.selectedItems.map(n => {
-                     return n.selector;
+                     const firstItem = n.selector.data[0];
+                     const compareExpr = (firstItem.expr || firstItem._expr) as powerbi.data.SQCompareExpr;
+                     const left = compareExpr.left as powerbi.data.SQColumnRefExpr;
+                     const leftEntity = left.source as powerbi.data.SQEntityExpr;
+                     const right = compareExpr.right as powerbi.data.SQConstantExpr;
+
+                     // Create the OO version
+                     const newRight = 
+                        new powerbi.data.SQConstantExpr(powerbi.ValueType.fromDescriptor(right.type), right.value, right.valueEncoded);
+                     const newLeftEntity = new powerbi.data.SQEntityExpr(leftEntity.schema, leftEntity.entity, leftEntity.variable);
+                     const newLeft = new powerbi.data.SQColumnRefExpr(newLeftEntity, left.ref);
+                     const newCompare = new powerbi.data.SQCompareExpr(compareExpr.comparison, newLeft, newRight);
+                     return {
+                        data: [{
+                            expr: newCompare,
+                            key: n.selector.data[0].key
+                        }, ],
+                     };
                  }));
              }
 
@@ -426,7 +443,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
                          match: n.match,
                          value: n.value,
                          renderedValue: n.renderedValue
-                     };
+,                     };
                  }));
              } else {
                  operation = "remove";
@@ -760,7 +777,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
             fontSize: oldFontSize !== s.fontSize,
             horizontal,
             valueWidthPercentage: oldVwp !== s.valueWidthPercentage
-        };
+,        };
     }
 
     /**
@@ -774,7 +791,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
                 data: n.data,
                 id: n.id,
                 metadata: n.metadata
-            }));
+,            }));
             filter = data.Selector.filterFromSelector(selectors);
         }
 
