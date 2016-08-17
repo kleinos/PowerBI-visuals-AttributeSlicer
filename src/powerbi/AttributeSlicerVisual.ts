@@ -11,7 +11,7 @@ const EVENTS_TO_IGNORE = "mousedown mouseup click focus blur input pointerdown p
 
 import { ListItem, ISlicerVisualData, ISettings, SlicerItem } from "./interfaces";
 import { AttributeSlicer as AttributeSlicerImpl } from "../AttributeSlicer";
-import { VisualBase, Visual } from "essex.powerbi.base";
+import { VisualBase } from "essex.powerbi.base";
 import * as _ from "lodash";
 import IVisual = powerbi.IVisual;
 import IVisualHostServices = powerbi.IVisualHostServices;
@@ -25,13 +25,32 @@ import IValueFormatter = powerbi.visuals.IValueFormatter;
 import valueFormatterFactory = powerbi.visuals.valueFormatter.create;
 import PixelConverter = jsCommon.PixelConverter;
 
-@Visual(require("../build").output.PowerBI)
 export default class AttributeSlicer extends VisualBase implements IVisual {
 
     /**
      * The set of capabilities for the visual
      */
     public static capabilities: VisualCapabilities = capabilities;
+
+    /**
+     * Getter for the update type
+     */
+    protected updateType = updateTypeGetter(this);
+
+    /**
+     * My AttributeSlicer
+     */
+    protected mySlicer: AttributeSlicerImpl;
+
+    /**
+     * The display units for the values
+     */
+    protected labelDisplayUnits = 0;
+
+    /**
+     * The precision to use with the values
+     */
+    protected labelPrecision: number;
 
     /**
      * The current dataView
@@ -42,11 +61,6 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
      * The host of the visual
      */
     private host: IVisualHostServices;
-
-    /**
-     * My AttributeSlicer
-     */
-    private mySlicer: AttributeSlicerImpl;
 
     private loadDeferred: JQueryDeferred<SlicerItem[]>;
 
@@ -74,21 +88,6 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
             this.updateSelectionFilter(selectedItems);
         },
         100);
-
-    /**
-     * Getter for the update type
-     */
-    private updateType = updateTypeGetter(this);
-
-    /**
-     * The display units for the values
-     */
-    private labelDisplayUnits = 0;
-
-    /**
-     * The precision to use with the values
-     */
-    private labelPrecision: number;
 
     /**
      * A property persister
@@ -309,21 +308,23 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
         const displayUnits = this.labelDisplayUnits !== (this.labelDisplayUnits = newSettings.labelDisplayUnits);
         const precision = this.labelPrecision !== (this.labelPrecision = newSettings.labelPrecision);
         const singleSelect = s.singleSelect !== (s.singleSelect = newSettings.singleSelect);
-        s.brushSelectionMode = newSettings.brushSelectionMode;
-        s.showSelections = newSettings.showSelections;
-        s.showOptions = newSettings.showOptions;
-        const searchString = newSettings.searchString;
-        if (searchString && searchString !== this.mySlicer.searchString) {
-            this.mySlicer.searchString = searchString;
+        const brushMode = s.brushSelectionMode !== (s.brushSelectionMode = newSettings.brushSelectionMode);
+        const showSelections = s.showSelections !== (s.showSelections = newSettings.showSelections);
+        const showOptions = s.showOptions !== (s.showOptions = newSettings.showOptions);
+        const newSearchString = newSettings.searchString;
+        let searchString = false;
+        if (newSearchString && newSearchString !== this.mySlicer.searchString) {
+            searchString = true;
+            this.mySlicer.searchString = newSearchString;
         }
 
-        this.mySlicer.valueWidthPercentage = newSettings.valueWidthPercentage;
-        this.mySlicer.renderHorizontal = newSettings.renderHorizontal;
+        const valueWidthPercentage = s.valueWidthPercentage !== (s.valueWidthPercentage = newSettings.valueWidthPercentage);
+        const renderHorizontal = s.renderHorizontal !== (s.renderHorizontal = newSettings.renderHorizontal);
         let pxSize = newSettings.textSize;
         if (pxSize) {
             pxSize = PixelConverter.fromPointToPixel(pxSize);
         }
-        this.mySlicer.fontSize = pxSize;
+        const fontSize = s.fontSize !== (s.fontSize = pxSize);
 
         // If our value displays change
         if ((displayUnits || precision) &&
@@ -354,6 +355,19 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
             // I guess it's safer/easier to do this than to think of all the possible issues doing it the other way.
             this.onSelectionChanged(this.mySlicer.selectedItems as ListItem[]);
         }
+
+        return {
+            displayUnits,
+            precision,
+            singleSelect,
+            brushMode,
+            showSelections,
+            showOptions,
+            fontSize,
+            searchString,
+            valueWidthPercentage,
+            renderHorizontal
+        };
     }
 
     /**
