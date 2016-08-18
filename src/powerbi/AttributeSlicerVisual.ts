@@ -104,7 +104,8 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             log("onSelectionChanged");
             this.updateSelectionFilter(selectedItems);
             const selection = selectedItems.map(n => n.match).join(",");
-            this.publishStateChange(`Selected ${selection}`, this.state);
+            const text = selection && selection.length ? `Selected ${selection}` : "Cleared Selection"; 
+            this.publishStateChange(text, this.state);
         },
         100);
 
@@ -311,20 +312,14 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         const dv = this.dataView = options.dataViews && options.dataViews[0];
         const metadata = dv && dv.metadata;
         if (dv) {
+            let settingsUpdates: any;
 
             // Is this necessary here? Shouldn't this be moved outside of the dataview check?
             if ((updateType & UpdateType.Settings) === UpdateType.Settings) {
                 // We need to reload the data if the case insensitivity changes (this filters the data and sends it to the slicer)
                 const hasDataChanges = (updateType & UpdateType.Data) === UpdateType.Data;
                 const newState = this.parseStateFromPowerBI(dv);
-                const changes = this.loadState(newState, hasDataChanges, false);
-                const changedKeys = Object.keys(changes).filter(n => changes[n] && n !== "searchString");
-                if (changedKeys.length) {
-                    const name = "Updated Settings: " + changedKeys.map(n => {
-                        return n;
-                    }).join(", ");
-                    this.publishStateChange(name, newState);
-                }
+                settingsUpdates = this.loadState(newState, hasDataChanges, false);
             }
 
             // We should show values if there are actually values
@@ -347,6 +342,15 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
                 });
             }
             this.loadSelectionFromPowerBI(dv);
+
+            // Important that this is done down here for selection to be retained
+            const changedKeys = settingsUpdates && Object.keys(settingsUpdates).filter(n => settingsUpdates[n] && n !== "searchString");
+            if (changedKeys.length) {
+                const name = "Updated Settings: " + changedKeys.map(n => {
+                    return n;
+                }).join(", ");
+                this.publishStateChange(name, this.state);
+            }
         } else {
             this.mySlicer.data = [];
             this.mySlicer.selectedItems = [];
@@ -559,7 +563,8 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         });
         mySlicer.events.on("searchPerformed", (searchText: string) => {
             if (!this.loadingState) {
-                this.publishStateChange(`Search for "${searchText}"`, this.state);
+                const text = searchText && searchText.length ? `Searched for "${searchText}"` : "Cleared Search";
+                this.publishStateChange(text, this.state);
             }
         });
 
@@ -677,29 +682,17 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             obj.properties[property] = value;
         }
 
-        // const objs = capabilities.objects;
-        // const toUpdate = $.extend(true, {}, state);
-        // Object.keys(toUpdate).forEach(stateProp => {
-        //     Object.keys(objs).forEach(objProp => {
-        //         const props = objs[objProp].properties;
-        //         if (props[stateProp]) {
-        //             addToPersist(objProp, stateProp, toUpdate[stateProp]);
-        //             delete toUpdate[stateProp];
-        //         }
-        //     });
-        // });
-
-        addToPersist("general", "showOptions", state.showOptions);
-        addToPersist("general", "textSize", state.textSize);
-
-        addToPersist("selection", "brushMode", state.brushMode);
-        addToPersist("selection", "singleSelect", state.singleSelect);
-        addToPersist("selection", "showSelections", state.showSelections);
-
-        addToPersist("display", "labelDisplayUnits", state.labelDisplayUnits);
-        addToPersist("display", "labelPrecision", state.labelPrecision);
-        addToPersist("display", "valueColumnWidth", state.valueColumnWidth);
-        addToPersist("display", "horizontal", state.horizontal);
+        const objs = capabilities.objects;
+        const toUpdate = $.extend(true, {}, state);
+        Object.keys(toUpdate).forEach(stateProp => {
+            Object.keys(objs).forEach(objProp => {
+                const props = objs[objProp].properties;
+                if (props[stateProp]) {
+                    addToPersist(objProp, stateProp, toUpdate[stateProp]);
+                    delete toUpdate[stateProp];
+                }
+            });
+        });
 
         const filter = this.buildSelectionFilter(state);
         let selection: any = undefined;
@@ -714,8 +707,15 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         }
 
         addToPersist("general", "filter", filter);
+
         addToPersist("general", "selection", selection);
-        addToPersist("general", "selfFilter", this.buildSelfFilter(this.mySlicer.searchString));
+        delete toUpdate.selectedItems;
+
+        addToPersist("general", "selfFilter", this.buildSelfFilter(state.searchText));
+        delete toUpdate.searchText;
+
+        // debug.assert(Object.keys(toUpdate).length === 0, `State not synched: ${Object.keys(toUpdate)}`);
+
         return pbiState;
     }
 
