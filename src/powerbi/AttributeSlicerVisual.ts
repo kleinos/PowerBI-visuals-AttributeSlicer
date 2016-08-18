@@ -676,10 +676,23 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             }
             obj.properties[property] = value;
         }
+
+        // const objs = capabilities.objects;
+        // const toUpdate = $.extend(true, {}, state);
+        // Object.keys(toUpdate).forEach(stateProp => {
+        //     Object.keys(objs).forEach(objProp => {
+        //         const props = objs[objProp].properties;
+        //         if (props[stateProp]) {
+        //             addToPersist(objProp, stateProp, toUpdate[stateProp]);
+        //             delete toUpdate[stateProp];
+        //         }
+        //     });
+        // });
+
         addToPersist("general", "showOptions", state.showOptions);
         addToPersist("general", "textSize", state.textSize);
 
-        addToPersist("selection", "textSize", state.textSize);
+        addToPersist("selection", "brushMode", state.brushMode);
         addToPersist("selection", "singleSelect", state.singleSelect);
         addToPersist("selection", "showSelections", state.showSelections);
 
