@@ -9,19 +9,69 @@ import TooltipEnabledDataPoint = powerbi.visuals.TooltipEnabledDataPoint;
 export interface ListItem extends SlicerItem, SelectableDataPoint, TooltipEnabledDataPoint { }
 
 /**
- * The settings that are in one way or another stored in powerbi
+ * Represents the state of the attribute slicer
  */
-export interface ISettings {
-    labelDisplayUnits: number;
-    labelPrecision: number;
-    singleSelect: boolean;
-    brushSelectionMode: boolean;
-    showSelections: boolean;
-    showOptions: boolean;
-    valueWidthPercentage: number;
-    renderHorizontal: boolean;
+export interface IAttributeSlicerState {
+
+    /**
+     * The currently selected search text
+     */
+    searchText: string;
+
+    /**
+     * If we are being rendered horizontally
+     */
+    horizontal: boolean;
+
+    /**
+     * The list of selected items
+     */
+    selectedItems?: {
+        match: any;
+        value: any;
+        renderedValue: any;
+        selector: any;
+    }[];
+
+    /**
+     * The text size in pt
+     */
     textSize: number;
-    searchString: string;
+
+    /**
+     * If we should show the options area
+     */
+    showOptions: boolean;
+
+    /**
+     * The percentage based width of the value column 0 = hidden, 100 = whole screen
+     */
+    valueColumnWidth: number;
+
+    /**
+     * The display units to use when rendering values
+     */
+    labelDisplayUnits: number;
+
+    /**
+     * The precision of the numbers to render
+     */
+    labelPrecision: number;
+
+    /**
+     * If we should single select
+     */
+    singleSelect: boolean;
+
+    /**
+     * If brushMode is enabled
+     */
+    brushMode: boolean;
+
+    /**
+     * If we should show the tokens
+     */
+    showSelections: boolean;
 }
 
 /**

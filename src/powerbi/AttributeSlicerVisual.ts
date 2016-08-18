@@ -1,5 +1,6 @@
 /* tslint:disable */
 import { logger, updateTypeGetter, UpdateType, PropertyPersister, createPropertyPersister } from "essex.powerbi.base";
+import { IStateful, register, IStateChangeListener, unregister, unregisterListener } from "pbi-stateful";
 import capabilities from "./AttributeSlicerVisual.capabilities";
 const colors = require("essex.powerbi.base/src/colors").full;
 
@@ -9,9 +10,9 @@ const log = logger("essex:widget:AttributeSlicerVisual");
 // PBI Swallows these
 const EVENTS_TO_IGNORE = "mousedown mouseup click focus blur input pointerdown pointerup touchstart touchmove touchdown";
 
-import { ListItem, ISlicerVisualData, ISettings, SlicerItem } from "./interfaces";
+import { ListItem, ISlicerVisualData, IAttributeSlicerState, SlicerItem } from "./interfaces";
 import { AttributeSlicer as AttributeSlicerImpl } from "../AttributeSlicer";
-import { VisualBase } from "essex.powerbi.base";
+import { VisualBase, Visual } from "essex.powerbi.base";
 import * as _ from "lodash";
 import IVisual = powerbi.IVisual;
 import IVisualHostServices = powerbi.IVisualHostServices;
@@ -25,7 +26,8 @@ import IValueFormatter = powerbi.visuals.IValueFormatter;
 import valueFormatterFactory = powerbi.visuals.valueFormatter.create;
 import PixelConverter = jsCommon.PixelConverter;
 
-export default class AttributeSlicer extends VisualBase implements IVisual {
+@Visual(require("../build").output.PowerBI)
+export default class AttributeSlicer extends VisualBase implements IVisual, IStateful<IAttributeSlicerState> {
 
     /**
      * The set of capabilities for the visual
@@ -50,7 +52,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
     /**
      * The precision to use with the values
      */
-    protected labelPrecision: number;
+    protected labelPrecision: number = 0;
 
     /**
      * The current dataView
@@ -61,6 +63,11 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
      * The host of the visual
      */
     private host: IVisualHostServices;
+
+    /**
+     * The list of state change listeners
+     */
+    private listeners: IStateChangeListener<IAttributeSlicerState>[] = [];
 
     private loadDeferred: JQueryDeferred<SlicerItem[]>;
 
@@ -74,6 +81,16 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
      */
     private loadingData = false;
 
+    /**
+     * Whether or not we are currently loading PBI from a state
+     */
+    private waitingForPBIAfterStateLoad = false;
+
+    /**
+     * Whether or not we are currently loading a state
+     */
+    private loadingState = false;
+
     /*
      * The current set of cacheddata
      */
@@ -86,6 +103,8 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
         (selectedItems: ListItem[]) => {
             log("onSelectionChanged");
             this.updateSelectionFilter(selectedItems);
+            const selection = selectedItems.map(n => n.match).join(",");
+            this.publishStateChange(`Selected ${selection}`, this.state);
         },
         100);
 
@@ -190,6 +209,51 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
     }
 
     /**
+     * Gets the name of the stateful component
+     */
+    public get name() { return "AttributeSlicer"; };
+
+    /**
+     * List of state change listeners
+     */
+    public get stateChangeListeners(): IStateChangeListener<IAttributeSlicerState>[] {
+        return this.listeners.slice(0);
+    }
+
+    /**
+     * Gets the current state
+     */
+    public get state(): IAttributeSlicerState {
+        return {
+            selectedItems: this.mySlicer.selectedItems.map(n => {
+                return _.merge({}, {
+                    match: n.match,
+                    value: n.value,
+                    renderedValue: n.renderedValue,
+                    selector: (<ListItem>n).identity.getSelector()
+                });
+            }),
+            searchText: this.mySlicer.searchString || "",
+            labelDisplayUnits: this.labelDisplayUnits || 0,
+            labelPrecision: this.labelPrecision || 0,
+            showOptions: this.mySlicer.showOptions,
+            showSelections: this.mySlicer.showSelections,
+            singleSelect: this.mySlicer.singleSelect,
+            brushMode: this.mySlicer.brushSelectionMode,
+            textSize: PixelConverter.toPoint(this.mySlicer.fontSize),
+            horizontal: this.mySlicer.renderHorizontal,
+            valueColumnWidth: this.mySlicer.valueWidthPercentage,
+        };
+    }
+
+    /**
+     * Setter for the state
+     */
+    public set state(state: IAttributeSlicerState) {
+        this.loadState(state, false, true);
+    }
+
+    /**
      * Called when the visual is being initialized
      */
     public init(options: powerbi.VisualInitOptions): void {
@@ -208,6 +272,23 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
         this.mySlicer = this.createAttributeSlicer(options.element);
 
         log("Loading Custom Sandbox: ", this.sandboxed);
+        register(this, window);
+    }
+
+    /**
+     * Registers a state change listener for the state
+     */
+    public registerStateChangeListener(listener: IStateChangeListener<IAttributeSlicerState>) {
+        if (listener) {
+            this.listeners.push(listener);
+        }
+    }
+
+    /**
+     * Registers a state change listener for the state
+     */
+    public unregisterStateChangeListener(listener: IStateChangeListener<IAttributeSlicerState>) {
+        unregisterListener(listener, this);
     }
 
     /**
@@ -235,8 +316,15 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
             if ((updateType & UpdateType.Settings) === UpdateType.Settings) {
                 // We need to reload the data if the case insensitivity changes (this filters the data and sends it to the slicer)
                 const hasDataChanges = (updateType & UpdateType.Data) === UpdateType.Data;
-                const newSettings = this.parseSettingsFromPowerBI(dv);
-                this.loadSettings(newSettings, hasDataChanges);
+                const newState = this.parseStateFromPowerBI(dv);
+                const changes = this.loadState(newState, hasDataChanges, false);
+                const changedKeys = Object.keys(changes).filter(n => changes[n] && n !== "searchString");
+                if (changedKeys.length) {
+                    const name = "Updated Settings: " + changedKeys.map(n => {
+                        return n;
+                    }).join(", ");
+                    this.publishStateChange(name, newState);
+                }
             }
 
             // We should show values if there are actually values
@@ -264,6 +352,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
             this.mySlicer.selectedItems = [];
         }
         this.loadingData = false;
+        this.waitingForPBIAfterStateLoad = false;
     }
 
     /**
@@ -300,31 +389,42 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
     }
 
     /**
-     * Loads our settings from the powerbi objects
+     * Loads our state from the given state
      */
-    public loadSettings(newSettings: ISettings, dataUpdate: boolean) {
-        log("Load Settings: ", JSON.stringify(newSettings));
+    public loadState(state: IAttributeSlicerState, dataUpdate: boolean, updatePBI: boolean) {
+        // We don't need to load the state if it hasn't changed
+        if (_.isEqual(state, this.state)) {
+            return;
+        }
+
+        log("Load State: ", JSON.stringify(state));
+        this.loadingState = true;
         const s = this.mySlicer;
-        const displayUnits = this.labelDisplayUnits !== (this.labelDisplayUnits = newSettings.labelDisplayUnits);
-        const precision = this.labelPrecision !== (this.labelPrecision = newSettings.labelPrecision);
-        const singleSelect = s.singleSelect !== (s.singleSelect = newSettings.singleSelect);
-        const brushMode = s.brushSelectionMode !== (s.brushSelectionMode = newSettings.brushSelectionMode);
-        const showSelections = s.showSelections !== (s.showSelections = newSettings.showSelections);
-        const showOptions = s.showOptions !== (s.showOptions = newSettings.showOptions);
-        const newSearchString = newSettings.searchString;
+        const displayUnits = this.labelDisplayUnits !== (this.labelDisplayUnits = state.labelDisplayUnits);
+        const precision = this.labelPrecision !== (this.labelPrecision = state.labelPrecision);
+        const singleSelect = s.singleSelect !== (s.singleSelect = state.singleSelect);
+        const brushMode = s.brushSelectionMode !== (s.brushSelectionMode = state.brushMode);
+        const showSelections = s.showSelections !== (s.showSelections = state.showSelections);
+        const showOptions = s.showOptions !== (s.showOptions = state.showOptions);
+        const newSearchString = state.searchText;
         let searchString = false;
-        if (newSearchString && newSearchString !== this.mySlicer.searchString) {
+        if (newSearchString !== this.mySlicer.searchString) {
             searchString = true;
             this.mySlicer.searchString = newSearchString;
         }
 
-        const valueWidthPercentage = s.valueWidthPercentage !== (s.valueWidthPercentage = newSettings.valueWidthPercentage);
-        const renderHorizontal = s.renderHorizontal !== (s.renderHorizontal = newSettings.renderHorizontal);
-        let pxSize = newSettings.textSize;
+        const oldVWP = s.valueWidthPercentage;
+        s.valueWidthPercentage = state.valueColumnWidth;
+        const valueWidthPercentage = s.valueWidthPercentage !== oldVWP;
+        const renderHorizontal = s.renderHorizontal !== (s.renderHorizontal = state.horizontal);
+        let pxSize = state.textSize;
         if (pxSize) {
             pxSize = PixelConverter.fromPointToPixel(pxSize);
         }
-        const fontSize = s.fontSize !== (s.fontSize = pxSize);
+        const oldFontSize = s.fontSize;
+        s.fontSize = pxSize;
+
+        const fontSize = s.fontSize !== oldFontSize;
 
         // If our value displays change
         if ((displayUnits || precision) &&
@@ -356,6 +456,12 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
             this.onSelectionChanged(this.mySlicer.selectedItems as ListItem[]);
         }
 
+        if (updatePBI) {
+            this.synchronizeStateWithPBI(state);
+        }
+
+        this.loadingState = false;
+
         return {
             displayUnits,
             precision,
@@ -368,6 +474,21 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
             valueWidthPercentage,
             renderHorizontal
         };
+    }
+
+    /**
+     * Synchronizes the current state with powerbi
+     */
+    public synchronizeStateWithPBI(state: IAttributeSlicerState) {
+        log("AttributeSlicer loading state into PBI", state);
+
+        if (this.host) {
+            this.waitingForPBIAfterStateLoad = true;
+
+            // Stolen from PBI's timeline
+            this.host.persistProperties(this.buildPersistObjects(state));
+            this.host.onSelect({ data: [] });
+        }
     }
 
     /**
@@ -406,6 +527,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
      * Gets called when PBI destroys this visual
      */
     public destroy() {
+        unregister(this, window);
         if (this.mySlicer) {
             this.mySlicer.destroy();
         }
@@ -431,14 +553,78 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
             return item.result = !!this.dataView && (isSearch || !!this.dataView.metadata.segment);
         });
         mySlicer.events.on("selectionChanged", (newItems: ListItem[]) => {
-            if (!this.loadingData) {
+            if (!this.loadingState && !this.loadingData && !this.waitingForPBIAfterStateLoad) {
                 this.onSelectionChanged(newItems);
+            }
+        });
+        mySlicer.events.on("searchPerformed", (searchText: string) => {
+            if (!this.loadingState) {
+                this.publishStateChange(`Search for "${searchText}"`, this.state);
             }
         });
 
         // Hide the searchbox by default
         mySlicer.showSearchBox = false;
         return mySlicer;
+    }
+
+    /**
+     * Updates the data filter based on the selection
+     */
+    protected updateSelectionFilter(items: ListItem[]) {
+        log("updateSelectionFilter");
+        let filter: data.SemanticFilter;
+        if (items && items.length) {
+            let selectors = items.map(n => n.identity.getSelector());
+            filter = data.Selector.filterFromSelector(selectors);
+        }
+
+        let objects: powerbi.VisualObjectInstancesToPersist = {};
+        let operation = "merge";
+        let selection: any = undefined;
+        if (filter) {
+            selection = JSON.stringify(items.map(n => ({
+                match: n.match,
+                value: n.value,
+                renderedValue: n.renderedValue,
+            })));
+        } else {
+            operation = "remove";
+        }
+
+        $.extend(objects, {
+            [operation]: [
+                <powerbi.VisualObjectInstance>{
+                    objectName: "general",
+                    selector: undefined,
+                    properties: {
+                        "filter": filter
+                    },
+                },
+                <powerbi.VisualObjectInstance>{
+                    objectName: "general",
+                    selector: undefined,
+                    properties: {
+                        "selection": selection
+                    },
+                },
+            ],
+        });
+
+        this.propertyPersister.persist(true, objects);
+    }
+
+    /**
+     * Publishes a state change
+     */
+    private publishStateChange(name: string, state: IAttributeSlicerState) {
+        this.listeners.forEach(n => {
+            n({
+                eventLabel: name,
+                state: state,
+                visual: this.name
+            });
+        });
     }
 
     private doesDataSupportSearch(dv: powerbi.DataView) {
@@ -467,51 +653,99 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
     }
 
     /**
+     * Builds the appropriate persist objects to persist the given state to PBI
+     */
+    private buildPersistObjects(state: IAttributeSlicerState) {
+        const pbiState = {};
+        const maps = {
+            merge: {},
+            remove: {}
+        };
+        function addToPersist(objectName: string, property: string, value: any) {
+            const operation = typeof value === "undefined" ? "remove" : "merge";
+            let obj = maps[operation][objectName];
+            if (!obj) {
+                obj = {
+                    objectName: objectName,
+                    selector: undefined,
+                    properties: {},
+                };
+                maps[operation][objectName] = obj;
+                pbiState[operation] = pbiState[operation] || [];
+                pbiState[operation].push(obj);
+            }
+            obj.properties[property] = value;
+        }
+        addToPersist("general", "showOptions", state.showOptions);
+        addToPersist("general", "textSize", state.textSize);
+
+        addToPersist("selection", "textSize", state.textSize);
+        addToPersist("selection", "singleSelect", state.singleSelect);
+        addToPersist("selection", "showSelections", state.showSelections);
+
+        addToPersist("display", "labelDisplayUnits", state.labelDisplayUnits);
+        addToPersist("display", "labelPrecision", state.labelPrecision);
+        addToPersist("display", "valueColumnWidth", state.valueColumnWidth);
+        addToPersist("display", "horizontal", state.horizontal);
+
+        const filter = this.buildSelectionFilter(state);
+        let selection: any = undefined;
+        if (filter) {
+            selection = JSON.stringify(state.selectedItems.map(n => {
+                return {
+                    match: n.match,
+                    value: n.value,
+                    renderedValue: n.renderedValue,
+                };
+            }));
+        }
+
+        addToPersist("general", "filter", filter);
+        addToPersist("general", "selection", selection);
+        addToPersist("general", "selfFilter", this.buildSelfFilter(this.mySlicer.searchString));
+        return pbiState;
+    }
+
+    /**
+     * Gets a selection filter based on the given slice state
+     */
+    private buildSelectionFilter(state: IAttributeSlicerState) {
+        let filter: data.SemanticFilter;
+        if (state.selectedItems && state.selectedItems.length) {
+            filter = data.Selector.filterFromSelector(state.selectedItems.map(n => {
+                const firstItem = n.selector.data[0];
+                const compareExpr = (firstItem.expr || firstItem._expr) as powerbi.data.SQCompareExpr;
+                const left = compareExpr.left as powerbi.data.SQColumnRefExpr;
+                const leftEntity = left.source as powerbi.data.SQEntityExpr;
+                const right = compareExpr.right as powerbi.data.SQConstantExpr;
+
+                // Create the OO version
+                const newRight =
+                    new powerbi.data.SQConstantExpr(powerbi.ValueType.fromDescriptor(right.type), right.value, right.valueEncoded);
+                const newLeftEntity = new powerbi.data.SQEntityExpr(leftEntity.schema, leftEntity.entity, leftEntity.variable);
+                const newLeft = new powerbi.data.SQColumnRefExpr(newLeftEntity, left.ref);
+                const newCompare = new powerbi.data.SQCompareExpr(compareExpr.comparison, newLeft, newRight);
+                return {
+                    data: [{
+                        expr: newCompare,
+                        key: n.selector.data[0].key
+                    }, ],
+                };
+            }));
+        }
+        return filter;
+    }
+
+    /**
      * Listener for when loading more data
      */
     private onLoadMoreData(item: any, isSearch: boolean) {
         if (isSearch) {
-            let st = this.mySlicer.searchString;
-            let filterExpr: data.SQExpr;
-            const source = this.dataView.categorical.categories[0].source;
-            const sourceType = source.type;
-            // Only support "contains" with text columns
-            // if (sourceType.extendedType === powerbi.ValueType.fromDescriptor({ text: true }).extendedType) {
-            if (st) {
-                if (sourceType.text) {
-                    let containsTextExpr = data.SQExprBuilder.text(st);
-                    filterExpr = data.SQExprBuilder.contains(<any>source.expr, containsTextExpr);
-                } /*else if (sourceType.dateTime) {
-                    const parsedDate = moment(st, AttributeSlicer.MOMENT_FORMATS);
-                    const dateValue = parsedDate.toDate();
-                    filterExpr = data.SQExprBuilder.equal(<any>source.expr, data.SQExprBuilder.dateTime(dateValue)); */
-                /* tslint:disable */
-                else {
-                    /* tslint:enable */
-                    let rightExpr: data.SQExpr;
-                    if (sourceType.numeric) {
-                        rightExpr = data.SQExprBuilder.typedConstant(parseFloat(st), sourceType);
-                    } else if (sourceType.bool) {
-                        rightExpr = data.SQExprBuilder.boolean(st === "1" || st === "true");
-                    }
-                    if (rightExpr) {
-                        filterExpr = data.SQExprBuilder.equal(<any>source.expr, rightExpr);
-                    }
-                }
-                // if (sourceType.extendedType === powerbi.ValueType.fromDescriptor({ integer: true }).extendedType ||
-                //     sourceType.extendedType === powerbi.ValueType.fromDescriptor({ numeric: true }).extendedType ||
-                //     sourceType.extendedType === powerbi.ValueType.fromDescriptor({ dateTime: true }).extendedType) {
-                //     builderType = "integer";
-                // }
-            }
-            let propToPersist: any;
+            const propToPersist = this.buildSelfFilter(this.mySlicer.searchString);
             let operation = "merge";
-            if (filterExpr && st) {
-                propToPersist = data.SemanticFilter.fromSQExpr(filterExpr);
-            } else {
+            if (!propToPersist) {
                 operation = "remove";
             }
-
             this.propertyPersister.persist(false, {
                 [operation]: [
                     <powerbi.VisualObjectInstance>{
@@ -542,6 +776,49 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
                 log("Loading more data");
             }
         }
+    }
+
+    /**
+     * Builds a self filter from the given search string
+     */
+    private buildSelfFilter(searchText: string) {
+        let filterExpr: data.SQExpr;
+        const source = this.dataView.categorical.categories[0].source;
+        const sourceType = source.type;
+        // Only support "contains" with text columns
+        // if (sourceType.extendedType === powerbi.ValueType.fromDescriptor({ text: true }).extendedType) {
+        if (searchText) {
+            if (sourceType.text) {
+                let containsTextExpr = data.SQExprBuilder.text(searchText);
+                filterExpr = data.SQExprBuilder.contains(<any>source.expr, containsTextExpr);
+            } /*else if (sourceType.dateTime) {
+                const parsedDate = moment(st, AttributeSlicer.MOMENT_FORMATS);
+                const dateValue = parsedDate.toDate();
+                filterExpr = data.SQExprBuilder.equal(<any>source.expr, data.SQExprBuilder.dateTime(dateValue)); */
+            /* tslint:disable */
+            else {
+                /* tslint:enable */
+                let rightExpr: data.SQExpr;
+                if (sourceType.numeric) {
+                    rightExpr = data.SQExprBuilder.typedConstant(parseFloat(searchText), sourceType);
+                } else if (sourceType.bool) {
+                    rightExpr = data.SQExprBuilder.boolean(searchText === "1" || searchText === "true");
+                }
+                if (rightExpr) {
+                    filterExpr = data.SQExprBuilder.equal(<any>source.expr, rightExpr);
+                }
+            }
+            // if (sourceType.extendedType === powerbi.ValueType.fromDescriptor({ integer: true }).extendedType ||
+            //     sourceType.extendedType === powerbi.ValueType.fromDescriptor({ numeric: true }).extendedType ||
+            //     sourceType.extendedType === powerbi.ValueType.fromDescriptor({ dateTime: true }).extendedType) {
+            //     builderType = "integer";
+            // }
+        }
+        let filter: data.SemanticFilter;
+        if (filterExpr) {
+            filter = data.SemanticFilter.fromSQExpr(filterExpr);
+        }
+        return filter;
     }
 
     /**
@@ -640,7 +917,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
     /**
      * Parses the settings that are stored in powerbi
      */
-    private parseSettingsFromPowerBI(dataView: powerbi.DataView): ISettings {
+    private parseStateFromPowerBI(dataView: powerbi.DataView): IAttributeSlicerState {
         const objects = dataView && dataView.metadata && dataView.metadata.objects;
         const selfFilter = this.syncSettingWithPBI(objects, "general", "selfFilter", undefined);
         const newSearch: data.SemanticFilter = selfFilter;
@@ -651,59 +928,13 @@ export default class AttributeSlicer extends VisualBase implements IVisual {
             labelDisplayUnits: this.syncSettingWithPBI(objects, "display", "labelDisplayUnits", 0),
             labelPrecision: this.syncSettingWithPBI(objects, "display", "labelPrecision", 0),
             singleSelect:  this.syncSettingWithPBI(objects, "selection", "singleSelect", false),
-            brushSelectionMode: this.syncSettingWithPBI(objects, "selection", "brushMode", false),
+            brushMode: this.syncSettingWithPBI(objects, "selection", "brushMode", false),
             showSelections: this.syncSettingWithPBI(objects, "selection", "showSelections", true),
             showOptions: this.syncSettingWithPBI(objects, "general", "showOptions", true),
-            valueWidthPercentage: this.syncSettingWithPBI(objects, "display", "valueColumnWidth", undefined),
-            renderHorizontal: this.syncSettingWithPBI(objects, "display", "horizontal", false),
+            valueColumnWidth: this.syncSettingWithPBI(objects, "display", "valueColumnWidth", undefined),
+            horizontal: this.syncSettingWithPBI(objects, "display", "horizontal", false),
             textSize: this.syncSettingWithPBI(objects, "general", "textSize", undefined),
-            searchString: right && right.value,
+            searchText: (right && right.value) || "",
         };
-    }
-
-    /**
-     * Updates the data filter based on the selection
-     */
-    private updateSelectionFilter(items: ListItem[]) {
-        log("updateSelectionFilter");
-        let filter: data.SemanticFilter;
-        if (items && items.length) {
-            let selectors = items.map(n => n.identity.getSelector());
-            filter = data.Selector.filterFromSelector(selectors);
-        }
-
-        let objects: powerbi.VisualObjectInstancesToPersist = {};
-        let operation = "merge";
-        let selection: any = undefined;
-        if (filter) {
-            selection = JSON.stringify(items.map(n => ({
-                match: n.match,
-                value: n.value,
-                renderedValue: n.renderedValue,
-            })));
-        } else {
-            operation = "remove";
-        }
-
-        $.extend(objects, {
-            [operation]: [
-                <powerbi.VisualObjectInstance>{
-                    objectName: "general",
-                    selector: undefined,
-                    properties: {
-                        "filter": filter
-                    },
-                },
-                <powerbi.VisualObjectInstance>{
-                    objectName: "general",
-                    selector: undefined,
-                    properties: {
-                        "selection": selection
-                    },
-                },
-            ],
-        });
-
-        this.propertyPersister.persist(true, objects);
     }
 }
