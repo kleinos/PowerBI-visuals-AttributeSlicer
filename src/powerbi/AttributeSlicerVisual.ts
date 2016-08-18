@@ -10,7 +10,14 @@ const log = logger("essex:widget:AttributeSlicerVisual");
 // PBI Swallows these
 const EVENTS_TO_IGNORE = "mousedown mouseup click focus blur input pointerdown pointerup touchstart touchmove touchdown";
 
-import { ListItem, ISlicerVisualData, IAttributeSlicerState, SlicerItem } from "./interfaces";
+import {
+    ListItem,
+    ISlicerVisualData,
+    IAttributeSlicerState,
+    SlicerItem,
+    SETTING_DESCRIPTORS,
+    IAttributeSlicerSettings
+} from "./interfaces";
 import { AttributeSlicer as AttributeSlicerImpl } from "../AttributeSlicer";
 import { VisualBase, Visual } from "essex.powerbi.base";
 import * as _ from "lodash";
@@ -104,7 +111,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             log("onSelectionChanged");
             this.updateSelectionFilter(selectedItems);
             const selection = selectedItems.map(n => n.match).join(",");
-            const text = selection && selection.length ? `Selected ${selection}` : "Cleared Selection"; 
+            const text = selection && selection.length ? `Selected ${selection}` : "Cleared Selection";
             this.publishStateChange(text, this.state);
         },
         100);
@@ -231,19 +238,27 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
                     match: n.match,
                     value: n.value,
                     renderedValue: n.renderedValue,
-                    selector: (<ListItem>n).identity.getSelector()
+                    selector: (<ListItem>n).identity.getSelector(),
                 });
             }),
             searchText: this.mySlicer.searchString || "",
-            labelDisplayUnits: this.labelDisplayUnits || 0,
-            labelPrecision: this.labelPrecision || 0,
-            showOptions: this.mySlicer.showOptions,
-            showSelections: this.mySlicer.showSelections,
-            singleSelect: this.mySlicer.singleSelect,
-            brushMode: this.mySlicer.brushSelectionMode,
-            textSize: PixelConverter.toPoint(this.mySlicer.fontSize),
-            horizontal: this.mySlicer.renderHorizontal,
-            valueColumnWidth: this.mySlicer.valueWidthPercentage,
+            settings: {
+                display: {
+                    labelDisplayUnits: this.labelDisplayUnits || 0,
+                    labelPrecision: this.labelPrecision || 0,
+                    horizontal: this.mySlicer.renderHorizontal,
+                    valueColumnWidth: this.mySlicer.valueWidthPercentage,
+                },
+                selection: {
+                    showSelections: this.mySlicer.showSelections,
+                    singleSelect: this.mySlicer.singleSelect,
+                    brushMode: this.mySlicer.brushSelectionMode,
+                },
+                general: {
+                    textSize: PixelConverter.toPoint(this.mySlicer.fontSize),
+                    showOptions: this.mySlicer.showOptions,
+                },
+            },
         };
     }
 
@@ -312,14 +327,14 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         const dv = this.dataView = options.dataViews && options.dataViews[0];
         const metadata = dv && dv.metadata;
         if (dv) {
-            let settingsUpdates: any;
+            let oldSettings = this.state.settings;
 
             // Is this necessary here? Shouldn't this be moved outside of the dataview check?
             if ((updateType & UpdateType.Settings) === UpdateType.Settings) {
                 // We need to reload the data if the case insensitivity changes (this filters the data and sends it to the slicer)
                 const hasDataChanges = (updateType & UpdateType.Data) === UpdateType.Data;
                 const newState = this.parseStateFromPowerBI(dv);
-                settingsUpdates = this.loadState(newState, hasDataChanges, false);
+                this.loadState(newState, hasDataChanges, false);
             }
 
             // We should show values if there are actually values
@@ -344,12 +359,12 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             this.loadSelectionFromPowerBI(dv);
 
             // Important that this is done down here for selection to be retained
-            const changedKeys = settingsUpdates && Object.keys(settingsUpdates).filter(n => settingsUpdates[n] && n !== "searchString");
-            if (changedKeys.length) {
-                const name = "Updated Settings: " + changedKeys.map(n => {
-                    return n;
-                }).join(", ");
-                this.publishStateChange(name, this.state);
+            const newState = this.state;
+            const newSettings = newState.settings;
+            const differences: string[] = this.findChangedSettings(oldSettings, newSettings);
+            if (differences.length) {
+                const name = "Updated Settings: " + differences.join(", ");
+                this.publishStateChange(name, newState);
             }
         } else {
             this.mySlicer.data = [];
@@ -370,24 +385,9 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         }, ];
         const instance = instances[0];
         const props = instance.properties;
-        if (options.objectName === "general") {
-            _.merge(props, {
-                textSize: PixelConverter.toPoint(this.mySlicer.fontSize),
-                showOptions: this.mySlicer.showOptions,
-            });
-        } else if (options.objectName === "display") {
-            _.merge(props, {
-                valueColumnWidth: this.mySlicer.valueWidthPercentage,
-                horizontal: this.mySlicer.renderHorizontal,
-                labelDisplayUnits: this.labelDisplayUnits,
-                labelPrecision: this.labelPrecision,
-            });
-        } else if (options.objectName === "selection") {
-            _.merge(props, {
-                singleSelect: this.mySlicer.singleSelect,
-                brushMode: this.mySlicer.brushSelectionMode,
-                showSelections: this.mySlicer.showSelections,
-            });
+        const state = this.state;
+        if (state.settings[options.objectName]) {
+            _.merge(props, state.settings[options.objectName]);
         }
         return instances;
     }
@@ -403,13 +403,14 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
 
         log("Load State: ", JSON.stringify(state));
         this.loadingState = true;
+        const settings = state.settings;
         const s = this.mySlicer;
-        const displayUnits = this.labelDisplayUnits !== (this.labelDisplayUnits = state.labelDisplayUnits);
-        const precision = this.labelPrecision !== (this.labelPrecision = state.labelPrecision);
-        const singleSelect = s.singleSelect !== (s.singleSelect = state.singleSelect);
-        const brushMode = s.brushSelectionMode !== (s.brushSelectionMode = state.brushMode);
-        const showSelections = s.showSelections !== (s.showSelections = state.showSelections);
-        const showOptions = s.showOptions !== (s.showOptions = state.showOptions);
+        const displayUnits = this.labelDisplayUnits !== (this.labelDisplayUnits = settings.display.labelDisplayUnits);
+        const precision = this.labelPrecision !== (this.labelPrecision = settings.display.labelPrecision);
+        const singleSelect = s.singleSelect !== (s.singleSelect = settings.selection.singleSelect);
+        const brushMode = s.brushSelectionMode !== (s.brushSelectionMode = settings.selection.brushMode);
+        const showSelections = s.showSelections !== (s.showSelections = settings.selection.showSelections);
+        const showOptions = s.showOptions !== (s.showOptions = settings.general.showOptions);
         const newSearchString = state.searchText;
         let searchString = false;
         if (newSearchString !== this.mySlicer.searchString) {
@@ -418,10 +419,10 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         }
 
         const oldVWP = s.valueWidthPercentage;
-        s.valueWidthPercentage = state.valueColumnWidth;
+        s.valueWidthPercentage = settings.display.valueColumnWidth;
         const valueWidthPercentage = s.valueWidthPercentage !== oldVWP;
-        const renderHorizontal = s.renderHorizontal !== (s.renderHorizontal = state.horizontal);
-        let pxSize = state.textSize;
+        const renderHorizontal = s.renderHorizontal !== (s.renderHorizontal = settings.display.horizontal);
+        let pxSize = settings.general.textSize;
         if (pxSize) {
             pxSize = PixelConverter.fromPointToPixel(pxSize);
         }
@@ -620,6 +621,24 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
     }
 
     /**
+     * Finds a list of changed settings
+     */
+    private findChangedSettings(oldSettings: IAttributeSlicerSettings, newSettings: IAttributeSlicerSettings) {
+        const differences: string[] = [];
+        Object.keys(newSettings).forEach(secN => {
+            const section = newSettings[secN];
+            Object.keys(section).forEach(setN => {
+                const oldSetting = oldSettings[secN][setN];
+                const newSetting = newSettings[secN][setN];
+                if (!_.isEqual(oldSetting, newSetting)) {
+                    differences.push(SETTING_DESCRIPTORS[secN][setN].displayName);
+                }
+            });
+        });
+        return differences;
+    }
+
+    /**
      * Publishes a state change
      */
     private publishStateChange(name: string, state: IAttributeSlicerState) {
@@ -682,15 +701,10 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             obj.properties[property] = value;
         }
 
-        const objs = capabilities.objects;
-        const toUpdate = $.extend(true, {}, state);
-        Object.keys(toUpdate).forEach(stateProp => {
-            Object.keys(objs).forEach(objProp => {
-                const props = objs[objProp].properties;
-                if (props[stateProp]) {
-                    addToPersist(objProp, stateProp, toUpdate[stateProp]);
-                    delete toUpdate[stateProp];
-                }
+        Object.keys(state.settings).forEach(settingSection => {
+            const section = state.settings[settingSection];
+            Object.keys(section).forEach(prop => {
+                addToPersist(settingSection, prop, section[prop]);
             });
         });
 
@@ -707,14 +721,8 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         }
 
         addToPersist("general", "filter", filter);
-
         addToPersist("general", "selection", selection);
-        delete toUpdate.selectedItems;
-
         addToPersist("general", "selfFilter", this.buildSelfFilter(state.searchText));
-        delete toUpdate.searchText;
-
-        // debug.assert(Object.keys(toUpdate).length === 0, `State not synched: ${Object.keys(toUpdate)}`);
 
         return pbiState;
     }
@@ -938,15 +946,23 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         const contains = whereItems && whereItems.length > 0 && whereItems[0].condition as data.SQContainsExpr;
         const right = contains && contains.right as data.SQConstantExpr;
         return {
-            labelDisplayUnits: this.syncSettingWithPBI(objects, "display", "labelDisplayUnits", 0),
-            labelPrecision: this.syncSettingWithPBI(objects, "display", "labelPrecision", 0),
-            singleSelect:  this.syncSettingWithPBI(objects, "selection", "singleSelect", false),
-            brushMode: this.syncSettingWithPBI(objects, "selection", "brushMode", false),
-            showSelections: this.syncSettingWithPBI(objects, "selection", "showSelections", true),
-            showOptions: this.syncSettingWithPBI(objects, "general", "showOptions", true),
-            valueColumnWidth: this.syncSettingWithPBI(objects, "display", "valueColumnWidth", undefined),
-            horizontal: this.syncSettingWithPBI(objects, "display", "horizontal", false),
-            textSize: this.syncSettingWithPBI(objects, "general", "textSize", undefined),
+            settings: {
+                display: {
+                    labelDisplayUnits: this.syncSettingWithPBI(objects, "display", "labelDisplayUnits", 0),
+                    labelPrecision: this.syncSettingWithPBI(objects, "display", "labelPrecision", 0),
+                    valueColumnWidth: this.syncSettingWithPBI(objects, "display", "valueColumnWidth", undefined),
+                    horizontal: this.syncSettingWithPBI(objects, "display", "horizontal", false),
+                },
+                general: {
+                    showOptions: this.syncSettingWithPBI(objects, "general", "showOptions", true),
+                    textSize: this.syncSettingWithPBI(objects, "general", "textSize", undefined),
+                },
+                selection: {
+                    singleSelect:  this.syncSettingWithPBI(objects, "selection", "singleSelect", false),
+                    brushMode: this.syncSettingWithPBI(objects, "selection", "brushMode", false),
+                    showSelections: this.syncSettingWithPBI(objects, "selection", "showSelections", true),
+                },
+            },
             searchText: (right && right.value) || "",
         };
     }
