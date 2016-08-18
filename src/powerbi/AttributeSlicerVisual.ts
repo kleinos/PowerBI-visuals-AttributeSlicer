@@ -1,6 +1,6 @@
 /* tslint:disable */
 import { logger, updateTypeGetter, UpdateType, PropertyPersister, createPropertyPersister } from "essex.powerbi.base";
-import { IStateful, register, IStateChangeListener, unregister, unregisterListener } from "pbi-stateful";
+import { IStateful, register, IStateChangeListener, publishChange, unregister, unregisterListener } from "pbi-stateful";
 import capabilities from "./AttributeSlicerVisual.capabilities";
 const colors = require("essex.powerbi.base/src/colors").full;
 
@@ -112,7 +112,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             this.updateSelectionFilter(selectedItems);
             const selection = selectedItems.map(n => n.match).join(",");
             const text = selection && selection.length ? `Selected ${selection}` : "Cleared Selection";
-            this.publishStateChange(text, this.state);
+            publishChange(this, text, this.state);
         },
         100);
 
@@ -219,7 +219,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
     /**
      * Gets the name of the stateful component
      */
-    public get name() { return "AttributeSlicer"; };
+    public get name() { return "Attribute Slicer"; };
 
     /**
      * List of state change listeners
@@ -364,7 +364,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             const differences: string[] = this.findChangedSettings(oldSettings, newSettings);
             if (differences.length) {
                 const name = "Updated Settings: " + differences.join(", ");
-                this.publishStateChange(name, newState);
+                publishChange(this, name, this.state);
             }
         } else {
             this.mySlicer.data = [];
@@ -565,7 +565,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         mySlicer.events.on("searchPerformed", (searchText: string) => {
             if (!this.loadingState) {
                 const text = searchText && searchText.length ? `Searched for "${searchText}"` : "Cleared Search";
-                this.publishStateChange(text, this.state);
+                publishChange(this, text, this.state);
             }
         });
 
@@ -636,19 +636,6 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             });
         });
         return differences;
-    }
-
-    /**
-     * Publishes a state change
-     */
-    private publishStateChange(name: string, state: IAttributeSlicerState) {
-        this.listeners.forEach(n => {
-            n({
-                eventLabel: name,
-                state: state,
-                visual: this.name
-            });
-        });
     }
 
     private doesDataSupportSearch(dv: powerbi.DataView) {
