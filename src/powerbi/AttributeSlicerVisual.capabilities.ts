@@ -1,6 +1,6 @@
 import { VisualBase } from "essex.powerbi.base";
 import VisualDataRoleKind = powerbi.VisualDataRoleKind;
-import StandardObjectProperties = powerbi.visuals.StandardObjectProperties;
+import { SETTING_DESCRIPTORS } from "./interfaces";
 import { DATA_WINDOW_SIZE } from "./AttributeSlicerVisual.defaults";
 import data = powerbi.data;
 
@@ -33,7 +33,7 @@ export default $.extend(true, {}, VisualBase.capabilities, {
         sorting: {
             default: {}
         },
-        objects: {
+        objects: $.extend(true, {}, {
             general: {
                 displayName: data.createDisplayNameGetter("Visual_General"),
                 properties: {
@@ -50,15 +50,6 @@ export default $.extend(true, {}, VisualBase.capabilities, {
                     selection: {
                         type: { text: {} }
                     },
-                    textSize: {
-                        displayName: data.createDisplayNameGetter("Visual_TextSize"),
-                        type: { numeric: true },
-                    },
-                    showOptions: {
-                        displayName: "Show Options",
-                        description: "Should the search box and other options be shown",
-                        type: { bool: true },
-                    },
                     selfFilter: {
                         type: { filter: { selfFilter: true } }
                     },
@@ -66,55 +57,24 @@ export default $.extend(true, {}, VisualBase.capabilities, {
                         type: { operations: { searchEnabled: true } }
                     },
                 },
-            },
-            display: {
-                displayName: "Display",
-                properties: {
-                    valueColumnWidth: {
-                        displayName: "Value Width %",
-                        description: "The percentage of the width that the value column should take up.",
-                        type: { numeric: true },
-                    },
-                    horizontal: {
-                        displayName: "Horizontal",
-                        description: "Display the attributes horizontally, rather than vertically",
-                        type: { bool: true },
-                    },
-                    labelDisplayUnits: StandardObjectProperties.labelDisplayUnits,
-                    labelPrecision: StandardObjectProperties.labelPrecision,
-                },
-            },
-            selection: {
-                displayName: "Selection",
-                properties: {
-                    brushMode: {
-                        displayName: "Brush Mode",
-                        description: "Allow for the drag selecting of attributes",
-                        type: { bool: true },
-                    },
-                    singleSelect: {
-                        displayName: "Single Select",
-                        description: "Only allow for a single selected",
-                        type: { bool: true },
-                    },
-                    showSelections: {
-                        displayName: "Use Tokens",
-                        description: "Will show the selected attributes as tokens",
-                        type: { bool: true },
-                    },
-                },
-            },
-            /*,
-            sorting: {
-                displayName: "Sorting",
-                properties: {
-                    byHistogram: {
-                        type: { bool: true }
-                    },
-                    byName: {
-                        type: { bool: true }
-                    }
-                }
-            }*/
-        },
+            }
+        }, buildObjects()),
     });
+
+function buildObjects() {
+    "use strict";
+    const objects = {};
+    Object.keys(SETTING_DESCRIPTORS).forEach(section => {
+        const objProps = objects[section] = {
+            properties: {}
+        };
+        const props = SETTING_DESCRIPTORS[section];
+        Object.keys(props).forEach(propName => {
+            if (propName === "displayName") {
+                objProps[propName] = props[propName];
+            }
+            objProps.properties[propName] = props[propName];
+        });
+    });
+    return objects;
+}

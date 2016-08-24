@@ -541,8 +541,15 @@ export class AttributeSlicer {
         if (this.searchString !== searchStr) {
             this.searchString = searchStr;
             if (this.serverSideSearch) {
-                setTimeout(() => this.checkLoadMoreDataBasedOnSearch(), 10);
+                const prevLoadState = this.loadingMoreData;
+                this.loadingMoreData = true;
+                setTimeout(() => {
+                    if (!this.checkLoadMoreDataBasedOnSearch()) {
+                        this.loadingMoreData = prevLoadState;
+                    }
+                }, 10);
             }
+            this.raiseSearchPerformed(searchStr);
         }
         // this is required because when the list is done searching it adds back in cached elements with selected flags
         this.syncItemVisiblity();
@@ -581,6 +588,13 @@ export class AttributeSlicer {
         if (shouldScrollLoad && !this.loadingMoreData && this.raiseCanLoadMoreData()) {
             this.raiseLoadMoreData(false);
         }
+    }
+
+    /**
+     * Raises the search performed event
+     */
+    protected raiseSearchPerformed(searchText: string) {
+        this.events.raiseEvent("searchPerformed", searchText);
     }
 
     /**
@@ -781,6 +795,7 @@ export class AttributeSlicer {
             // we're not currently loading data, cause we cancelled
             this.loadingMoreData = false;
             this.raiseLoadMoreData(true);
+            return true;
         }
     }
 }
