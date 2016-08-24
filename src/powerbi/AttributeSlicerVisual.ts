@@ -145,6 +145,13 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
 
         // Tell base we should not load sandboxed
         VisualBase.DEFAULT_SANDBOX_ENABLED = false;
+
+        const className = this.myCssModule && this.myCssModule.locals && this.myCssModule.locals.className;
+        if (className) {
+            this.element.addClass(className);
+        }
+        // HAX: I am a strong, independent element and I don't need no framework tellin me how much focus I can have
+        this.element.on(EVENTS_TO_IGNORE, (e) => e.stopPropagation());
     }
 
     /**
@@ -276,20 +283,10 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
      * Called when the visual is being initialized
      */
     public init(options: powerbi.VisualInitOptions): void {
-        super.init(options, `<div></div>`.trim());
-
-        const className = this.myCssModule && this.myCssModule.locals && this.myCssModule.locals.className;
-        if (className) {
-            this.element.addClass(className);
-        }
-
-        // HAX: I am a strong, independent element and I don't need no framework tellin me how much focus I can have
-        this.element.on(EVENTS_TO_IGNORE, (e) => e.stopPropagation());
-
+        super.init(options);
         this.host = options.host;
         this.propertyPersister = createPropertyPersister(this.host, 100);
         this.mySlicer = this.createAttributeSlicer(options.element);
-
         log("Loading Custom Sandbox: ", this.sandboxed);
         register(this, window);
     }
@@ -549,6 +546,10 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         if (this.mySlicer) {
             this.mySlicer.destroy();
         }
+    }
+
+    public get template() {
+        return "<div></div>";
     }
 
     /**
