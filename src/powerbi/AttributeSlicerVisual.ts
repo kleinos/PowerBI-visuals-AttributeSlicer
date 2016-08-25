@@ -1,10 +1,24 @@
 /* tslint:disable */
-import { logger, updateTypeGetter, UpdateType, PropertyPersister, createPropertyPersister } from "essex.powerbi.base";
-import { IStateful, register, IStateChangeListener, publishChange, unregister, unregisterListener, publishNameResolved } from "pbi-stateful";
+import { 
+    logger, 
+    updateTypeGetter, 
+    UpdateType, 
+    PropertyPersister, 
+    createPropertyPersister,
+} from "essex.powerbi.base";
+import {
+    IStateful,
+    register,
+    IStateChangeListener, 
+    publishChange, 
+    unregister, 
+    unregisterListener, 
+    publishNameChange, 
+} from "pbi-stateful";
 import capabilities from "./AttributeSlicerVisual.capabilities";
 const colors = require("essex.powerbi.base/src/colors").full;
 
-const log = logger("essex:widget:AttributeSlicerVisual");
+const log = logger("essex.widget.AttributeSlicer");
 /* tslint:enable */
 
 // PBI Swallows these
@@ -132,8 +146,6 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
      */
     private myCssModule: any;
 
-    private isNameSet = false;
-
     /**
      * Constructor
      */
@@ -150,7 +162,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         if (className) {
             this.element.addClass(className);
         }
-        // HAX: I am a strong, independent element and I don't need no framework tellin me how much focus I can have
+        // HACK: PowerBI Swallows these events unless we prevent propagation upwards
         this.element.on(EVENTS_TO_IGNORE, (e) => e.stopPropagation());
     }
 
@@ -311,8 +323,9 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
      * Called when the visual is being updated
      */
     public update(options: powerbi.VisualUpdateOptions) {
-        const updateType = this.updateType();
         super.update(options);
+        log("Update", options);
+        const updateType = this.updateType();
 
         // Make sure the slicer has some sort of dimensions
         if (!this.mySlicer.dimensions) {
@@ -323,14 +336,14 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             this.mySlicer.dimensions = options.viewport;
         }
 
-        if (!this.isNameSet && options.dataViews.length > 0) {
+        if (options.dataViews.length > 0) {
             const oldName = this.name;
-            let name = "AttributeSlicer::";
-            options.dataViews[0].metadata.columns.forEach(c => name += `${c.queryName}:`)
-            log("AttributeSlicer Resolved Name: " + name);
-            this.name = name;
-            this.isNameSet = true;
-            publishNameResolved(this, oldName, name);
+            const candidateName = "AttributeSlicer::" + options.dataViews[0].metadata.columns.map(c => `${c.queryName}`).join("::");
+            if (oldName !== candidateName) {
+                log("AttributeSlicer Name Change: %s => %s", oldName, candidateName);
+                this.name = candidateName;
+                publishNameChange(this, oldName, candidateName);
+            }
         }
 
         this.loadingData = true;
