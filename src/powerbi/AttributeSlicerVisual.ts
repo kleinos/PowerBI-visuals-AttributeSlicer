@@ -1,19 +1,19 @@
 /* tslint:disable */
-import { 
-    logger, 
-    updateTypeGetter, 
-    UpdateType, 
-    PropertyPersister, 
+import {
+    logger,
+    updateTypeGetter,
+    UpdateType,
+    PropertyPersister,
     createPropertyPersister,
 } from "essex.powerbi.base";
 import {
     IStateful,
     register,
-    IStateChangeListener, 
-    publishChange, 
-    unregister, 
-    unregisterListener, 
-    publishNameChange, 
+    IStateChangeListener,
+    publishChange,
+    unregister,
+    unregisterListener,
+    publishNameChange,
 } from "pbi-stateful";
 import capabilities from "./AttributeSlicerVisual.capabilities";
 const colors = require("essex.powerbi.base/src/colors").full;
@@ -46,6 +46,7 @@ import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInst
 import IValueFormatter = powerbi.visuals.IValueFormatter;
 import valueFormatterFactory = powerbi.visuals.valueFormatter.create;
 import PixelConverter = jsCommon.PixelConverter;
+const CUSTOM_CSS_MODULE = require("!css!sass!./css/AttributeSlicerVisual.scss");
 
 @Visual(require("../build").output.PowerBI)
 export default class AttributeSlicer extends VisualBase implements IVisual, IStateful<IAttributeSlicerState> {
@@ -142,23 +143,13 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
     private propertyPersister: PropertyPersister;
 
     /**
-     * My css module
-     */
-    private myCssModule: any;
-
-    /**
      * Constructor
      */
     constructor(noCss = false) {
         super(noCss);
-        if (!noCss) {
-             this.myCssModule = require("!css!sass!./css/AttributeSlicerVisual.scss");
-        }
-
         // Tell base we should not load sandboxed
         VisualBase.DEFAULT_SANDBOX_ENABLED = false;
-
-        const className = this.myCssModule && this.myCssModule.locals && this.myCssModule.locals.className;
+        const className = CUSTOM_CSS_MODULE && CUSTOM_CSS_MODULE.locals && CUSTOM_CSS_MODULE.locals.className;
         if (className) {
             this.element.addClass(className);
         }
@@ -569,7 +560,10 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
      * Gets the inline css used for this element
      */
     protected getCss(): string[] {
-        return this.myCssModule ? super.getCss().concat([this.myCssModule + ""]) : [];
+        return [
+            ...super.getCss(),
+            `${CUSTOM_CSS_MODULE}`
+        ];
     }
 
     /**
