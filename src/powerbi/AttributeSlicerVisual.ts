@@ -237,7 +237,8 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             color: color,
             value: value || 0,
             renderedValue: renderedValue,
-            equals: (b: ListItem) => id.equals((<ListItem>b).identity),
+            equals: (b: ListItem) => category === b.match,
+            // equals: (b: ListItem) => id.equals((<ListItem>b).identity),
         };
     }
 
@@ -295,10 +296,12 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
      * Setter for the state
      */
     public set state(state: IAttributeSlicerState) {
+        state = _.cloneDeep(state);
         log("setstate current=%s, incoming=%s", this.state.id, state.id, state);
         if (state.id !== this.state.id) {
             this._state = state;
-            this.loadState(state, true, false);
+            this.loadState(state);
+            this.synchronizeStateWithPBI(state);
         }
     }
 
@@ -392,7 +395,11 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
                     metadata: this.getCategoryInfoFromPowerBI(dv),
                 });
             }
-            this.loadSelectionFromPowerBI(dv);
+
+            // const selection = this.parseSelectionFromPBI(dv);
+            // if (selection) {
+            //     this.mySlicer.selectedItems = selection;
+            // }
 
             // Important that this is done down here for selection to be retained
             const newState = this.generateState();
@@ -431,7 +438,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
     /**
      * Loads our state from the given state
      */
-    public loadState(state: IAttributeSlicerState, dataUpdate: boolean, updatePBI: boolean) {
+    public loadState(state: IAttributeSlicerState) {
         log("Load State: ", JSON.stringify(state));
         this.loadingState = true;
         const settings = state.settings;
@@ -464,8 +471,6 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
 
         // If our value displays change
         if ((displayUnits || precision) &&
-            !dataUpdate && // We don't need to do anything if we will be changing the underlying data anyhow
-            // No point in doing anything if there is not data
             this.mySlicer.data &&
             this.mySlicer.data.length) {
             const formatter = this.createValueFormatter();
@@ -492,9 +497,20 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             this.onSelectionChanged(this.mySlicer.selectedItems as ListItem[]);
         }
 
-        if (updatePBI) {
-            this.synchronizeStateWithPBI(state);
-        }
+//selectedItems[0].identity.getSelector().data[0]
+        this.mySlicer.selectedItems = ((this.dataView && state.selectedItems) || []).map(n => {
+            const expr = this.buildSQExprFromSerializedSelection(n);
+            const identity = SelectionId.createWithId(powerbi.data.createDataViewScopeIdentity(expr));
+            return AttributeSlicer.createItem(
+                n.match,
+                n.value,
+                identity,
+                n.renderedValue);
+        });
+        // this.mySlicer.selectedItems = <any>selectionIds.map((n: any, i: number) => {
+        //     const slimItem = selectionItems[i];
+        //     return AttributeSlicer.createItem(slimItem.match, slimItem.value, n, slimItem.renderedValue);
+        // });
 
         this.loadingState = false;
         return {
@@ -758,18 +774,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         let filter: data.SemanticFilter;
         if (state.selectedItems && state.selectedItems.length) {
             filter = data.Selector.filterFromSelector(state.selectedItems.map(n => {
-                const firstItem = n.selector.data[0];
-                const compareExpr = (firstItem.expr || firstItem._expr) as powerbi.data.SQCompareExpr;
-                const left = compareExpr.left as powerbi.data.SQColumnRefExpr;
-                const leftEntity = left.source as powerbi.data.SQEntityExpr;
-                const right = compareExpr.right as powerbi.data.SQConstantExpr;
-
-                // Create the OO version
-                const newRight =
-                    new powerbi.data.SQConstantExpr(powerbi.ValueType.fromDescriptor(right.type), right.value, right.valueEncoded);
-                const newLeftEntity = new powerbi.data.SQEntityExpr(leftEntity.schema, leftEntity.entity, leftEntity.variable);
-                const newLeft = new powerbi.data.SQColumnRefExpr(newLeftEntity, left.ref);
-                const newCompare = new powerbi.data.SQCompareExpr(compareExpr.comparison, newLeft, newRight);
+                const newCompare = this.buildSQExprFromSerializedSelection(n);
                 return {
                     data: [{
                         expr: newCompare,
@@ -779,6 +784,22 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             }));
         }
         return filter;
+    }
+
+    private buildSQExprFromSerializedSelection(n: any) {
+        const firstItem = n.selector.data[0];
+        const compareExpr = (firstItem.expr || firstItem._expr) as powerbi.data.SQCompareExpr;
+        const left = compareExpr.left as powerbi.data.SQColumnRefExpr;
+        const leftEntity = left.source as powerbi.data.SQEntityExpr;
+        const right = compareExpr.right as powerbi.data.SQConstantExpr;
+
+        // Create the OO version
+        const newRight =
+            new powerbi.data.SQConstantExpr(powerbi.ValueType.fromDescriptor(right.type), right.value, right.valueEncoded);
+        const newLeftEntity = new powerbi.data.SQEntityExpr(leftEntity.schema, leftEntity.entity, leftEntity.variable);
+        const newLeft = new powerbi.data.SQColumnRefExpr(newLeftEntity, left.ref);
+        const newCompare = new powerbi.data.SQCompareExpr(compareExpr.comparison, newLeft, newRight);
+        return newCompare;
     }
 
     /**
@@ -969,7 +990,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         const whereItems = newSearch && newSearch.where();
         const contains = whereItems && whereItems.length > 0 && whereItems[0].condition as data.SQContainsExpr;
         const right = contains && contains.right as data.SQConstantExpr;
-        return {
+        const state: IAttributeSlicerState = {
             id: getNextStateId(),
             settings: {
                 display: {
@@ -990,5 +1011,54 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             },
             searchText: (right && right.value) || "",
         };
+        const selectedItems = this.parseSelectionFromPBI(dataView);
+        if (selectedItems) {
+            state.selectedItems = selectedItems.map(n => {
+                return _.merge({}, {
+                    match: n.match,
+                    value: n.value,
+                    renderedValue: n.renderedValue,
+                    selector: (<ListItem>n).identity.getSelector(),
+                });
+            });
+        }
+        return state;
+    }
+
+
+    /**
+     * Loads the selection from PowerBI
+     */
+    private parseSelectionFromPBI(dataView: powerbi.DataView) {
+        const objects = dataView && dataView.metadata && dataView.metadata.objects;
+        if (objects) {
+            // HAX: Stupid crap to restore selection
+            let filter = objects["general"] && objects["general"]["filter"];
+            let whereItems = filter && filter.whereItems;
+            let condition = whereItems && whereItems[0] && whereItems[0].condition;
+            let values = condition && condition.values;
+            let args = condition && condition.args;
+            let selectedItems: any[] = [];
+            if (values && args && values.length && args.length) {
+                const selectionItems: ListItem[] = JSON.parse(objects["general"]["selection"]);
+                let sourceExpr = filter.whereItems[0].condition.args[0];
+                const selectionIds = values.map((n: any) => {
+                    return SelectionId.createWithId(powerbi.data.createDataViewScopeIdentity(
+                        powerbi.data.SQExprBuilder.compare(data.QueryComparisonKind.Equal,
+                            sourceExpr,
+                            n[0]
+                        )
+                    ));
+                });
+                selectedItems = <any>selectionIds.map((n: any, i: number) => {
+                    const slimItem = selectionItems[i];
+                    return AttributeSlicer.createItem(slimItem.match, slimItem.value, n, slimItem.renderedValue);
+                });
+            }
+            return selectedItems;
+            // this.mySlicer.selectedItems = selectedItems;
+        } else if (dataView) { // If we have a dataview, but we don't have any selection, then clear it
+            return [];
+        }
     }
 }
