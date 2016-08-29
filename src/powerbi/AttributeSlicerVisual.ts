@@ -48,6 +48,12 @@ import valueFormatterFactory = powerbi.visuals.valueFormatter.create;
 import PixelConverter = jsCommon.PixelConverter;
 const CUSTOM_CSS_MODULE = require("!css!sass!./css/AttributeSlicerVisual.scss");
 
+if (!window["ATTRIBUTE_SLICER_STATE_ID"]) {
+    window["ATTRIBUTE_SLICER_STATE_ID"] = 1;
+}
+
+const getNextStateId = () => window["ATTRIBUTE_SLICER_STATE_ID"]++;
+
 @Visual(require("../build").output.PowerBI)
 export default class AttributeSlicer extends VisualBase implements IVisual, IStateful<IAttributeSlicerState> {
 
@@ -123,6 +129,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
      * The current set of cacheddata
      */
     private data: SlicerItem[];
+    private _state: IAttributeSlicerState = null;
 
     /**
      * Updates the data filter based on the selection
@@ -133,7 +140,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             this.updateSelectionFilter(selectedItems);
             const selection = selectedItems.map(n => n.match).join(",");
             const text = selection && selection.length ? `Selected ${selection}` : "Cleared Selection";
-            publishChange(this, text, this.state);
+            publishChange(this, text, this.generateState());
         },
         100);
 
@@ -241,45 +248,58 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         return this.listeners.slice(0);
     }
 
+    protected generateState() {
+        this._state = null;
+        return this.state;
+    }
+
     /**
      * Gets the current state
      */
     public get state(): IAttributeSlicerState {
-        return {
-            selectedItems: this.mySlicer.selectedItems.map(n => {
-                return _.merge({}, {
-                    match: n.match,
-                    value: n.value,
-                    renderedValue: n.renderedValue,
-                    selector: (<ListItem>n).identity.getSelector(),
-                });
-            }),
-            searchText: this.mySlicer.searchString || "",
-            settings: {
-                display: {
-                    labelDisplayUnits: this.labelDisplayUnits || 0,
-                    labelPrecision: this.labelPrecision || 0,
-                    horizontal: this.mySlicer.renderHorizontal,
-                    valueColumnWidth: this.mySlicer.valueWidthPercentage,
+        if (!this._state) {
+            this._state = {
+                id: getNextStateId(),
+                selectedItems: this.mySlicer.selectedItems.map(n => {
+                    return _.merge({}, {
+                        match: n.match,
+                        value: n.value,
+                        renderedValue: n.renderedValue,
+                        selector: (<ListItem>n).identity.getSelector(),
+                    });
+                }),
+                searchText: this.mySlicer.searchString || "",
+                settings: {
+                    display: {
+                        labelDisplayUnits: this.labelDisplayUnits || 0,
+                        labelPrecision: this.labelPrecision || 0,
+                        horizontal: this.mySlicer.renderHorizontal,
+                        valueColumnWidth: this.mySlicer.valueWidthPercentage,
+                    },
+                    selection: {
+                        showSelections: this.mySlicer.showSelections,
+                        singleSelect: this.mySlicer.singleSelect,
+                        brushMode: this.mySlicer.brushSelectionMode,
+                    },
+                    general: {
+                        textSize: PixelConverter.toPoint(this.mySlicer.fontSize),
+                        showOptions: this.mySlicer.showOptions,
+                    },
                 },
-                selection: {
-                    showSelections: this.mySlicer.showSelections,
-                    singleSelect: this.mySlicer.singleSelect,
-                    brushMode: this.mySlicer.brushSelectionMode,
-                },
-                general: {
-                    textSize: PixelConverter.toPoint(this.mySlicer.fontSize),
-                    showOptions: this.mySlicer.showOptions,
-                },
-            },
-        };
+            };
+        }
+        return this._state;
     }
 
     /**
      * Setter for the state
      */
     public set state(state: IAttributeSlicerState) {
-        this.loadState(state, false, true);
+        log("setstate current=%s, incoming=%s", this.state.id, state.id, state);
+        if (state.id !== this.state.id) {
+            this._state = state;
+            this.loadState(state, true, false);
+        }
     }
 
     /**
@@ -327,6 +347,8 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             this.mySlicer.dimensions = options.viewport;
         }
 
+        // Rename the unique ID of this visual based on the incoming columns. 
+        // This is a bit of a hack in lieu of having a GUID or some kind of instance identifier for this visual.
         if (options.dataViews.length > 0) {
             const oldName = this.name;
             const candidateName = "AttributeSlicer::" + options.dataViews[0].metadata.columns.map(c => `${c.queryName}`).join("::");
@@ -346,9 +368,9 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             // Is this necessary here? Shouldn't this be moved outside of the dataview check?
             if ((updateType & UpdateType.Settings) === UpdateType.Settings) {
                 // We need to reload the data if the case insensitivity changes (this filters the data and sends it to the slicer)
-                const hasDataChanges = (updateType & UpdateType.Data) === UpdateType.Data;
+                // const hasDataChanges = (updateType & UpdateType.Data) === UpdateType.Data;
                 const newState = this.parseStateFromPowerBI(dv);
-                this.loadState(newState, hasDataChanges, false);
+                this.state = newState;
             }
 
             // We should show values if there are actually values
@@ -373,7 +395,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
             this.loadSelectionFromPowerBI(dv);
 
             // Important that this is done down here for selection to be retained
-            const newState = this.state;
+            const newState = this.generateState();
             const newSettings = newState.settings;
             const differences: string[] = this.findChangedSettings(oldSettings, newSettings);
             if (differences.length) {
@@ -410,11 +432,6 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
      * Loads our state from the given state
      */
     public loadState(state: IAttributeSlicerState, dataUpdate: boolean, updatePBI: boolean) {
-        // We don't need to load the state if it hasn't changed
-        if (_.isEqual(state, this.state)) {
-            return;
-        }
-
         log("Load State: ", JSON.stringify(state));
         this.loadingState = true;
         const settings = state.settings;
@@ -480,7 +497,6 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         }
 
         this.loadingState = false;
-
         return {
             displayUnits,
             precision,
@@ -586,7 +602,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         mySlicer.events.on("searchPerformed", (searchText: string) => {
             if (!this.loadingState) {
                 const text = searchText && searchText.length ? `Searched for "${searchText}"` : "Cleared Search";
-                publishChange(this, text, this.state);
+                publishChange(this, text, this.generateState());
             }
         });
 
@@ -954,6 +970,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
         const contains = whereItems && whereItems.length > 0 && whereItems[0].condition as data.SQContainsExpr;
         const right = contains && contains.right as data.SQConstantExpr;
         return {
+            id: getNextStateId(),
             settings: {
                 display: {
                     labelDisplayUnits: this.syncSettingWithPBI(objects, "display", "labelDisplayUnits", 0),

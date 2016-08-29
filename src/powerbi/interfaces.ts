@@ -14,6 +14,7 @@ export interface ListItem extends SlicerItem, SelectableDataPoint, TooltipEnable
  * Represents the state of the attribute slicer
  */
 export interface IAttributeSlicerState {
+    id: number;
 
     /**
      * The currently selected search text
