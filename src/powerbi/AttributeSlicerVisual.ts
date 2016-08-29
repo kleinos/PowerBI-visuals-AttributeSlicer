@@ -14,6 +14,7 @@ import {
     unregister,
     unregisterListener,
     publishNameChange,
+    publishStateInjectionRequest,
 } from "pbi-stateful";
 import capabilities from "./AttributeSlicerVisual.capabilities";
 const colors = require("essex.powerbi.base/src/colors").full;
@@ -130,6 +131,7 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
      */
     private data: SlicerItem[];
     private _state: IAttributeSlicerState = null;
+    private isNameResolved = false;
 
     /**
      * Updates the data filter based on the selection
@@ -359,6 +361,10 @@ export default class AttributeSlicer extends VisualBase implements IVisual, ISta
                 log("AttributeSlicer Name Change: %s => %s", oldName, candidateName);
                 this.name = candidateName;
                 publishNameChange(this, oldName, candidateName);
+                if (!this.isNameResolved) {
+                    publishStateInjectionRequest(this);
+                }
+                this.isNameResolved = true;
             }
         }
 
