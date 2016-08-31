@@ -1,127 +1,16 @@
-import { SlicerItem } from "../interfaces";
+import { SlicerItem, IAttributeSlicerSettings, IAttributeSlicerState } from "../interfaces";
 import SelectableDataPoint = powerbi.visuals.SelectableDataPoint;
 import TooltipEnabledDataPoint = powerbi.visuals.TooltipEnabledDataPoint;
 import StandardObjectProperties = powerbi.visuals.StandardObjectProperties;
-import data = powerbi.data;
 
 /**
  * Represents a list item
  */
 /* tslint:disable */
-export interface ListItem extends SlicerItem, SelectableDataPoint, TooltipEnabledDataPoint { }
-
-/**
- * Represents the state of the attribute slicer
- */
-export interface IAttributeSlicerState {
-    id: number;
-
-    /**
-     * The currently selected search text
-     */
-    searchText: string;
-
-    /**
-     * The list of selected items
-     */
-    selectedItems?: {
-        match: any;
-        value: any;
-        renderedValue: any;
-        selector: any;
-    }[];
-
-    /**
-     * The set of settings for the attribute slicer
-     */
-    settings: IAttributeSlicerSettings;
+export interface ListItem extends SlicerItem, TooltipEnabledDataPoint {
+    // The unique selector for this item
+    selector: powerbi.data.Selector;
 }
-
-/**
- * Represents slicer data
- */
-export interface ISlicerVisualData {
-    /**
-     * The actual dataset
-     */
-    data: SlicerItem[];
-
-    /**
-     * Metadata which describes the data
-     */
-    metadata: { 
-        /**
-         * The name of the category column
-         */
-        categoryColumnName: string;
-
-        /**
-         * Whether or not there is even categories
-         */
-        hasCategories: boolean;
-    };
-};
-
-/**
- * The attribute slicer settings
- */
-export interface IAttributeSlicerSettings {
-
-    general: {    
-        /**
-         * The text size in pt
-         */
-        textSize: number;
-
-        /**
-         * If we should show the options area
-         */
-        showOptions: boolean;
-
-    }
-
-    display: {
-
-        /**
-         * The percentage based width of the value column 0 = hidden, 100 = whole screen
-         */
-        valueColumnWidth: number;
-
-        /**
-         * The display units to use when rendering values
-         */
-        labelDisplayUnits: number;
-
-        /**
-         * The precision of the numbers to render
-         */
-        labelPrecision: number;
-
-        /**
-         * If we are being rendered horizontally
-         */
-        horizontal: boolean;
-    }
-
-    selection: {
-        /**
-         * If we should single select
-         */
-        singleSelect: boolean;
-
-        /**
-         * If brushMode is enabled
-         */
-        brushMode: boolean;
-
-        /**
-         * If we should show the tokens
-         */
-        showSelections: boolean;
-    }
-}
-
-export type SlicerItem = SlicerItem;
 
 /**
  * Contains a list of settings descriptions
@@ -175,3 +64,7 @@ export const SETTING_DESCRIPTORS: IAttributeSlicerSettings = {
             $.extend(true, {}, StandardObjectProperties.labelPrecision as any, { displayName: "Precision" }),
     } as any
 };
+
+export type SlicerItem = SlicerItem;
+export type IAttributeSlicerSettings = IAttributeSlicerSettings;
+export type IAttributeSlicerState = IAttributeSlicerState;
