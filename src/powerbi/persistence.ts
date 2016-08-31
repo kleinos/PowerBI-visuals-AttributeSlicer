@@ -1,7 +1,7 @@
-import * as _ from "lodash";
 import { IAttributeSlicerState } from "../interfaces";
-import { buildSelfFilter, buildSQExprFromSerializedSelection } from "./exprUtils";
+import { buildSelfFilter, buildSQExprFromSerializedSelection } from "./expressions";
 import data = powerbi.data;
+import PixelConverter = jsCommon.PixelConverter;
 
 /**
  * Creates a persistence object builder
@@ -11,7 +11,7 @@ export default function createPersistObjectBuilder() {
     const pbiState = {};
     const maps = {
         merge: {},
-        remove: {}
+        remove: {},
     };
     const me = {
         persist: function addToPersist(objectName: string, property: string, value: any, operation?: string, selector?: string) {
@@ -31,7 +31,7 @@ export default function createPersistObjectBuilder() {
             obj.properties[property] = value;
             return me;
         },
-        build: () => pbiState
+        build: () => pbiState,
     };
     return me;
 }
@@ -47,7 +47,11 @@ export function buildPersistObjects(dataView: powerbi.DataView, state: IAttribut
     Object.keys(state.settings).forEach(settingSection => {
         const section = state.settings[settingSection];
         Object.keys(section).forEach(prop => {
-            persistBuilder.persist(settingSection, prop, section[prop]);
+            let value = section[prop];
+            if (prop === "textSize") {
+                value = PixelConverter.toPoint(value);
+            }
+            persistBuilder.persist(settingSection, prop, value);
         });
     });
 
@@ -83,7 +87,7 @@ function buildSelectionFilter(state: IAttributeSlicerState) {
             return {
                 data: [{
                     expr: newCompare,
-                    key: n.selector.data[0].key
+                    key: n.selector.data[0].key,
                 }, ],
             };
         }));

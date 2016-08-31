@@ -6,14 +6,14 @@ import {
     PropertyPersister,
     createPropertyPersister,
 } from "essex.powerbi.base";
-import parseStateFromPowerBI from "./stateParser";
-import { buildSelfFilter } from "./exprUtils";
+import parseStateFromPowerBI from "./stateParsing";
+import { buildSelfFilter } from "./expressions";
 import { publishChange, StatefulVisual, IDimensions } from "pbi-stateful";
-import converter from "./dataConverter";
+import converter from "./dataConversion";
 import capabilities from "./AttributeSlicerVisual.capabilities";
 import { createValueFormatter } from "./formatting";
 
-import { buildPersistObjects, default as createPersistObjectBuilder } from "./persistObjects";
+import { buildPersistObjects, default as createPersistObjectBuilder } from "./persistence";
 import { ListItem, SlicerItem, SETTING_DESCRIPTORS } from "./interfaces";
 import { IAttributeSlicerState } from "../interfaces";
 import { AttributeSlicer as AttributeSlicerImpl } from "../AttributeSlicer";
@@ -150,9 +150,8 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
     /**
      * Called when the visual is being updated
      */
-    public onUpdate(options: powerbi.VisualUpdateOptions) {
+    public onUpdate(options: powerbi.VisualUpdateOptions, updateType: UpdateType) {
         log("Update", options);
-        const updateType = this.updateType();
 
         // Make sure the slicer has some sort of dimensions
         if (!this.mySlicer.dimensions) {
@@ -160,9 +159,9 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         }
 
         const dv = this.dataView = options.dataViews && options.dataViews[0];
-
-        this.onUpdateLoadData(updateType, dv);
-        this.onUpdateLoadState(dv);
+        const newState = parseStateFromPowerBI(dv);
+        this.onUpdateLoadData(updateType, dv, newState);
+        this.onUpdateLoadState(dv, newState);
     }
 
     /**
@@ -215,6 +214,9 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         if (state.settings[options.objectName]) {
             _.merge(props, state.settings[options.objectName]);
         }
+        if (options.objectName === "general") {
+            props["textSize"] = PixelConverter.toPoint(parseFloat(props["textSize"] + ""));
+        }
         return instances;
     }
 
@@ -244,22 +246,20 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
             settings: {
                 display: {
                     labelDisplayUnits: this.labelDisplayUnits || 0,
-                    labelPrecision: this.labelPrecision || 0
+                    labelPrecision: this.labelPrecision || 0,
                 },
-            }
+            },
         });
     }
 
     /**
      * Checks whether or not to load data from the dataView
      */
-    private onUpdateLoadData(updateType: UpdateType, dv: DataView) {
+    private onUpdateLoadData(updateType: UpdateType, dv: DataView, pbiState: IAttributeSlicerState) {
         // Load data if the data has definitely changed, sometimes however it hasn't actually changed
         // ie search for Microsof then Microsoft
         if (dv) {
             if ((updateType & UpdateType.Data) === UpdateType.Data || this.loadDeferred) {
-                const source = ldget(dv, "categorical.categories[0]");
-                const columnName = source && source.queryName;
                 const data = converter(dv);
 
                 log("Loading data from PBI");
@@ -277,41 +277,42 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
                     delete this.loadDeferred;
                 }
 
+                const columnName = ldget(dv, "categorical.categories[0].source.queryName");
+
                 // if the user has changed the categories, then selection is done for
                 if (!columnName ||
                     (this.currentCategory && this.currentCategory !== columnName)) {
+                    // This will really be undefined behaviour for pbi-stateful because this indicates the user changed datasets
                     log("Clearing Selection, Categories Changed");
-                    this.mySlicer.selectedItems = [];
-                    this.mySlicer.searchString = "";
+                    pbiState.selectedItems = [];
+                    pbiState.searchText = "";
                 }
 
                 this.currentCategory = columnName;
             }
         } else {
             this.mySlicer.data = [];
-            this.mySlicer.selectedItems = [];
+            pbiState.selectedItems = [];
         }
     }
 
     /**
      * Checks if the settings have changed from PBI
      */
-    private onUpdateLoadState(dv: DataView) {
+    private onUpdateLoadState(dv: DataView, pbiState: IAttributeSlicerState) {
         // Important that this is done down here for selection to be retained
         // const newState = this.generateState();
         const oldState = this.state;
-        const newState = parseStateFromPowerBI(dv);
-
-        if (!_.isEqual(oldState, newState)) {
+        if (!_.isEqual(oldState, pbiState)) {
 
             const oldSettings = oldState.settings;
-            const newSettings = newState.settings;
+            const newSettings = pbiState.settings;
             const differences: string[] = [];
             Object.keys(newSettings).forEach(secN => {
                 const section = newSettings[secN];
                 Object.keys(section).forEach(setN => {
-                    const oldSetting = oldSettings[secN][setN];
-                    const newSetting = newSettings[secN][setN];
+                    const oldSetting = ldget(oldSettings, `${secN}.{setN}`);
+                    const newSetting = ldget(newSettings, `${secN}.{setN}`);
                     if (!_.isEqual(oldSetting, newSetting)) {
                         const descriptor = SETTING_DESCRIPTORS[secN][setN];
                         differences.push(descriptor ? descriptor.displayName : setN);
@@ -320,12 +321,13 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
             });
 
             // New state has changed, so update the slicer
-            this.state = newState;
+            log("PBI has changed, updating state");
+            this.state = pbiState;
 
             // If there are any settings updates
             if (differences.length) {
                 const name = "Updated Settings: " + differences.join(", ");
-                publishChange(this, name, newState);
+                publishChange(this, name, pbiState);
             }
         }
     }

@@ -5,28 +5,19 @@ import JQuerySelectionManager from "./selection/JQuerySelectionManager";
 import { SlicerItem, IAttributeSlicerState } from "./interfaces";
 import { prettyPrintValue as pretty } from "./Utils";
 import itemTemplate from "./SlicerItem.tmpl";
-import { logger } from "essex.powerbi.base"; // TODO: this should be a utils, not pbi
+// import { logger } from "essex.powerbi.base"; // TODO: this should be a utils, not pbi
+import { SEARCH_DEBOUNCE, DEFAULT_VALUE_WIDTH, DEFAULT_TEXT_SIZE } from "./AttributeSlicer.defaults";
 
 /* tslint:disable */
 const naturalSort = require("javascript-natural-sort");
 const VirtualList = require("./lib/VirtualList");
-const log = logger("essex.widget.AttributeSlicer");
+const log = require("debug")("essex.widget.AttributeSlicer");
 /* tslint:enable */
 
 /**
  * Represents an advanced slicer to help slice through data
  */
 export class AttributeSlicer {
-
-    /**
-     * The number of milliseconds before running the search, after a user stops typing.
-     */
-    private static SEARCH_DEBOUNCE = 500;
-
-    /**
-     * The value column default width
-     */
-    private static DEFAULT_VALUE_WIDTH = 66;
 
     /**
      * The template for this visual
@@ -384,9 +375,9 @@ export class AttributeSlicer {
     /**
      * Setter for the percentage width of the value column (10 - 100)
      */
-    private _valueWidthPercentage: number = AttributeSlicer.DEFAULT_VALUE_WIDTH;
+    private _valueWidthPercentage: number = DEFAULT_VALUE_WIDTH;
     public set valueWidthPercentage(value: number) {
-        value = value ? Math.max(Math.min(value, 100), 10) : AttributeSlicer.DEFAULT_VALUE_WIDTH;
+        value = value ? Math.max(Math.min(value, 100), 10) : DEFAULT_VALUE_WIDTH;
         if (value !== this._valueWidthPercentage) {
             this._valueWidthPercentage = value;
             this.resizeColumns();
@@ -489,7 +480,7 @@ export class AttributeSlicer {
     /**
      * Controls the size of the font
      */
-    private _fontSize: number = 12; // 12 px
+    private _fontSize: number = DEFAULT_TEXT_SIZE; // 12 px
     public get fontSize() {
         return this._fontSize;
     }
@@ -498,7 +489,7 @@ export class AttributeSlicer {
      * Setter for fontSize
      */
     public set fontSize(value: number) {
-        value = value || 12;
+        value = value || DEFAULT_TEXT_SIZE;
         if (value !== this._fontSize) {
             this._fontSize = value;
             this.slicerEle.css({
@@ -863,7 +854,7 @@ export class AttributeSlicer {
      */
     private attachEvents() {
         const searchDebounced =
-            _.debounce(() => this.search(this.getSearchStringFromElement()), AttributeSlicer.SEARCH_DEBOUNCE);
+            _.debounce(() => this.search(this.getSearchStringFromElement()), SEARCH_DEBOUNCE);
 
         this.element.find(".searchbox").on("input", () => {
             if (!this.loadingSearch) {

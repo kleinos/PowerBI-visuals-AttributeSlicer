@@ -2,9 +2,11 @@ import {
     ListItem,
     IAttributeSlicerState,
 } from "./interfaces";
-import { createItem } from "./dataConverter";
+import { createItem } from "./dataConversion";
 import data = powerbi.data;
 import SelectionId = powerbi.visuals.SelectionId;
+import { DEFAULT_VALUE_WIDTH, DEFAULT_TEXT_SIZE } from "../AttributeSlicer.defaults";
+import PixelConverter = jsCommon.PixelConverter;
 
 /* tslint:disable */
 const ldget = require("lodash.get");
@@ -21,12 +23,13 @@ export default function parseStateFromPowerBI(dataView: powerbi.DataView): IAttr
     const whereItems = newSearch && newSearch.where();
     const contains = whereItems && whereItems.length > 0 && whereItems[0].condition as data.SQContainsExpr;
     const right = contains && contains.right as data.SQConstantExpr;
+    const ptTextSize = ldget(objects, "general.textSize", undefined);
     const state: IAttributeSlicerState = {
         settings: {
             display: {
                 labelDisplayUnits: ldget(objects, "display.labelDisplayUnits", 0),
                 labelPrecision: ldget(objects, "display.labelPrecision", 0),
-                valueColumnWidth: ldget(objects, "display.valueColumnWidth", undefined),
+                valueColumnWidth: ldget(objects, "display.valueColumnWidth", DEFAULT_VALUE_WIDTH),
                 horizontal: ldget(objects, "display.horizontal", false),
             },
             general: {
@@ -36,7 +39,7 @@ export default function parseStateFromPowerBI(dataView: powerbi.DataView): IAttr
                     doesDataSupportSearch(dataView) &&
                     !ldget(objects, "general.selfFilterEnabled", false),
                 showValues: ldget(dataView, "categorical.values", []).length > 0,
-                textSize: ldget(objects, "general.textSize", undefined),
+                textSize: ptTextSize ? PixelConverter.fromPointToPixel(parseFloat(ptTextSize)) : DEFAULT_TEXT_SIZE,
             },
             selection: {
                 singleSelect:  ldget(objects, "selection.singleSelect", false),

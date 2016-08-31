@@ -15,6 +15,7 @@ export default function converter(
     dataView: DataView,
     valueFormatter?: IValueFormatter,
     categoryFormatter?: IValueFormatter): ListItem[] {
+    "use strict";
     if (!valueFormatter) {
         valueFormatter = createValueFormatter();
     }

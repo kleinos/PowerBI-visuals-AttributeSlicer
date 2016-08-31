@@ -51,6 +51,7 @@ describe("AttributeSlicer", () => {
 
     const createData = (...items: string[]) => {
         return items.map((n: string) => ({
+            id: n,
             match: n,
             value: n,
             selected: false,

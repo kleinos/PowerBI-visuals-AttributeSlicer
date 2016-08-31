@@ -57,7 +57,7 @@ export default $.extend(true, {}, VisualBase.capabilities, {
                         type: { operations: { searchEnabled: true } }
                     },
                 },
-            }
+            },
         }, buildObjects()),
     });
 

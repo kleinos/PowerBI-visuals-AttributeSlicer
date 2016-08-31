@@ -1,5 +1,4 @@
 import { SlicerItem, IAttributeSlicerSettings, IAttributeSlicerState } from "../interfaces";
-import SelectableDataPoint = powerbi.visuals.SelectableDataPoint;
 import TooltipEnabledDataPoint = powerbi.visuals.TooltipEnabledDataPoint;
 import StandardObjectProperties = powerbi.visuals.StandardObjectProperties;
 
