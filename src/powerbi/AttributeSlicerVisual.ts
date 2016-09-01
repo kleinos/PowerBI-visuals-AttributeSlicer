@@ -6,14 +6,14 @@ import {
     PropertyPersister,
     createPropertyPersister,
 } from "essex.powerbi.base";
-import parseStateFromPowerBI from "./stateParsing";
+import { buildPersistObjectsFromState, buildStateFromPowerBI } from "./stateConversion";
 import { buildSelfFilter } from "./expressions";
 import { publishChange, StatefulVisual, IDimensions } from "pbi-stateful";
 import converter from "./dataConversion";
 import capabilities from "./AttributeSlicerVisual.capabilities";
 import { createValueFormatter } from "./formatting";
 
-import { buildPersistObjects, default as createPersistObjectBuilder } from "./persistence";
+import { default as createPersistObjectBuilder } from "./persistence";
 import { ListItem, SlicerItem, SETTING_DESCRIPTORS } from "./interfaces";
 import { IAttributeSlicerState } from "../interfaces";
 import { AttributeSlicer as AttributeSlicerImpl } from "../AttributeSlicer";
@@ -159,7 +159,7 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         }
 
         const dv = this.dataView = options.dataViews && options.dataViews[0];
-        const newState = parseStateFromPowerBI(dv);
+        const newState = buildStateFromPowerBI(dv);
         this.onUpdateLoadData(updateType, dv, newState);
         this.onUpdateLoadState(dv, newState);
     }
@@ -412,7 +412,7 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
 
         if (this.host) {
             // Stolen from PBI's timeline
-            this.propertyPersister.persist(true, buildPersistObjects(this.dataView, state));
+            this.propertyPersister.persist(true, buildPersistObjectsFromState(this.dataView, state));
         }
     }
 }

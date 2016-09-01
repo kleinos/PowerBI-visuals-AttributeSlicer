@@ -2,12 +2,13 @@ import {
     ListItem,
     IAttributeSlicerState,
 } from "./interfaces";
+import createPersistObjectBuilder from "./persistence";
+import { buildSelfFilter, buildSQExprFromSerializedSelection } from "./expressions";
 import { createItem } from "./dataConversion";
 import data = powerbi.data;
 import SelectionId = powerbi.visuals.SelectionId;
 import { DEFAULT_VALUE_WIDTH, DEFAULT_TEXT_SIZE } from "../AttributeSlicer.defaults";
 import PixelConverter = jsCommon.PixelConverter;
-
 /* tslint:disable */
 const ldget = require("lodash.get");
 /* tslint:enable */
@@ -15,7 +16,7 @@ const ldget = require("lodash.get");
 /**
  * Parses the settings that are stored in powerbi
  */
-export default function parseStateFromPowerBI(dataView: powerbi.DataView): IAttributeSlicerState {
+export function buildStateFromPowerBI(dataView: powerbi.DataView): IAttributeSlicerState {
     "use strict";
     const objects = dataView && dataView.metadata && dataView.metadata.objects;
     const selfFilter = ldget(objects, "general.selfFilter", undefined);
@@ -102,4 +103,62 @@ function doesDataSupportSearch(dv: powerbi.DataView) {
         return source && metadataSource && metadataSource.type.text && source.type.text;
     }
     return false;
+}
+
+/**
+ * Builds the appropriate persist objects to persist the given state to PBI
+ */
+export function buildPersistObjectsFromState(dataView: powerbi.DataView, state: IAttributeSlicerState) {
+    "use strict";
+    let persistBuilder = createPersistObjectBuilder();
+
+    Object.keys(state.settings).forEach(settingSection => {
+        const section = state.settings[settingSection];
+        Object.keys(section).forEach(prop => {
+            let value = section[prop];
+            if (prop === "textSize") {
+                value = PixelConverter.toPoint(value);
+            }
+            persistBuilder.persist(settingSection, prop, value);
+        });
+    });
+
+    const filter = buildSelectionFilter(state);
+    let selection: any = undefined;
+    if (filter) {
+        selection = JSON.stringify(state.selectedItems.map(n => {
+            return {
+                match: n.match,
+                value: n.value,
+                renderedValue: n.renderedValue,
+            };
+        }));
+    }
+
+    persistBuilder
+        .persist("general", "filter", filter)
+        .persist("general", "selection", selection)
+        .persist("general", "selfFilter", buildSelfFilter(dataView, state.searchText));
+
+    return persistBuilder.build();
+}
+
+/**
+ * Gets a selection filter based on the given slice state
+ */
+function buildSelectionFilter(state: IAttributeSlicerState) {
+    "use strict";
+    let filter: data.SemanticFilter;
+    if (state.selectedItems && state.selectedItems.length) {
+        filter = data.Selector.filterFromSelector(state.selectedItems.map(n => {
+            const newCompare = buildSQExprFromSerializedSelection(n.selector);
+            return {
+                data: [{
+                    expr: newCompare,
+                    key: n.selector.data[0].key,
+                }, ],
+            };
+        }));
+    }
+    return filter;
 }
