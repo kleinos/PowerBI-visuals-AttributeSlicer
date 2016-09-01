@@ -220,7 +220,7 @@ export class AttributeSlicer {
 
         this.selectedItems = (state.selectedItems || []).map(n => {
             return _.merge({}, n, {
-                equals: (m: SlicerItem) => m.match === n.match
+                equals: (m: SlicerItem) => m.id === n.id
             });
         });
         s.renderHorizontal = state.settings.display.horizontal;

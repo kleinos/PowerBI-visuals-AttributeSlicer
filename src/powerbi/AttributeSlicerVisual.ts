@@ -6,6 +6,7 @@ import {
     PropertyPersister,
     createPropertyPersister,
 } from "essex.powerbi.base";
+import { isStateEqual } from "../Utils";
 import { buildPersistObjectsFromState, buildStateFromPowerBI } from "./stateConversion";
 import { buildSelfFilter } from "./expressions";
 import { publishChange, StatefulVisual, IDimensions } from "pbi-stateful";
@@ -169,7 +170,7 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
      */
     public onSetState(state: IAttributeSlicerState, oldState: IAttributeSlicerState) {
         log("setstate ", state);
-        if (!_.isEqual(state, oldState)) {
+        if (!isStateEqual(state, oldState)) {
             state = _.cloneDeep(state);
 
             // Set the state on the slicer
@@ -274,6 +275,10 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
                     delete this.loadDeferred;
                 } else {
                     this.mySlicer.data = filteredData;
+
+                    // Restore selection
+                    this.mySlicer.selectedItems = <any>(pbiState.selectedItems || []);
+
                     delete this.loadDeferred;
                 }
 
@@ -303,7 +308,7 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         // Important that this is done down here for selection to be retained
         // const newState = this.generateState();
         const oldState = this.state;
-        if (!_.isEqual(oldState, pbiState)) {
+        if (!isStateEqual(oldState, pbiState)) {
 
             const oldSettings = oldState.settings;
             const newSettings = pbiState.settings;
@@ -325,8 +330,8 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
             this.state = pbiState;
 
             // If there are any settings updates
-            if (differences.length) {
-                const name = "Updated Settings: " + differences.join(", ");
+            if (differences.length || !_.isEqual(oldSettings, newSettings)) {
+                const name = `Updated Settings${ differences.length ? ": " + differences.join(", ") : "" }`;
                 publishChange(this, name, pbiState);
             }
         }
