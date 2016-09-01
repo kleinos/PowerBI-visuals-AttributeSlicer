@@ -6,7 +6,7 @@ import { SlicerItem, IAttributeSlicerState } from "./interfaces";
 import { prettyPrintValue as pretty } from "./Utils";
 import itemTemplate from "./SlicerItem.tmpl";
 // import { logger } from "essex.powerbi.base"; // TODO: this should be a utils, not pbi
-import { SEARCH_DEBOUNCE, DEFAULT_VALUE_WIDTH, DEFAULT_TEXT_SIZE } from "./AttributeSlicer.defaults";
+import { SEARCH_DEBOUNCE, DEFAULT_VALUE_WIDTH, DEFAULT_TEXT_SIZE, DEFAULT_STATE } from "./AttributeSlicer.defaults";
 
 /* tslint:disable */
 const naturalSort = require("javascript-natural-sort");
@@ -199,6 +199,7 @@ export class AttributeSlicer {
     public set state(state: IAttributeSlicerState) {
         log("Load State: ", JSON.stringify(state));
         this.loadingState = true;
+        state = _.merge({}, _.cloneDeep(DEFAULT_STATE), state);
         const settings = state.settings;
         const s = this;
         // const displayUnits = this.labelDisplayUnits !== (this.labelDisplayUnits = settings.display.labelDisplayUnits);
@@ -223,6 +224,7 @@ export class AttributeSlicer {
             });
         });
         s.renderHorizontal = state.settings.display.horizontal;
+        s.valueWidthPercentage = settings.display.valueColumnWidth;
 
         this.loadingState = false;
     }
