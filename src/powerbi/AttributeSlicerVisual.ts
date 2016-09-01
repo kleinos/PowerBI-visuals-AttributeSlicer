@@ -168,9 +168,14 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
     /**
      * Sets the given state into the attribute slicer
      */
-    public onSetState(state: IAttributeSlicerState, oldState: IAttributeSlicerState) {
+    public onSetState(state: IAttributeSlicerState) {
         log("setstate ", state);
-        if (!isStateEqual(state, oldState)) {
+
+        // The old state passed in the params, is the old *cached* version, so if we change the state ourselves
+        // Then oldState will not actually reflect the correct old state.
+        const currentState = this.generateState();
+        // Since the other one is cached.
+        if (!isStateEqual(state, currentState)) {
             state = _.cloneDeep(state);
 
             // Set the state on the slicer
