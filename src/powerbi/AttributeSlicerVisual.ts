@@ -9,7 +9,7 @@ import {
 import { isStateEqual } from "../Utils";
 import { buildPersistObjectsFromState, buildStateFromPowerBI } from "./stateConversion";
 import { buildSelfFilter } from "./expressions";
-import { publishChange, StatefulVisual, IDimensions } from "pbi-stateful";
+import { publishReplace, publishChange, StatefulVisual, IDimensions } from "pbi-stateful";
 import converter from "./dataConversion";
 import capabilities from "./AttributeSlicerVisual.capabilities";
 import { createValueFormatter } from "./formatting";
@@ -337,7 +337,8 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
             // If there are any settings updates
             if (differences.length || !_.isEqual(oldSettings, newSettings)) {
                 const name = `Updated Settings${ differences.length ? ": " + differences.join(", ") : "" }`;
-                publishChange(this, name, pbiState);
+                // ctrevino - Publishing a state change here causes invisible states to pop in with multiple visuals.
+                publishReplace(this, name, pbiState);
             }
         }
     }
