@@ -8,7 +8,6 @@
 /dump
 
 # IDE / Editors
-.vscode
 *~
 
 # Build Artifacts

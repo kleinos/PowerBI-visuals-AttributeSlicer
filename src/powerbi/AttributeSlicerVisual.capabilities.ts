@@ -3,8 +3,9 @@ import VisualDataRoleKind = powerbi.VisualDataRoleKind;
 import { SETTING_DESCRIPTORS } from "./interfaces";
 import { DATA_WINDOW_SIZE } from "./AttributeSlicerVisual.defaults";
 import data = powerbi.data;
+const log = require('debug')('AttributeSlicer::Capabilities');
 
-export default $.extend(true, {}, VisualBase.capabilities, {
+const capabilities = $.extend(true, {}, VisualBase.capabilities, {
         dataRoles: [
             {
                 name: "Category",
@@ -61,6 +62,9 @@ export default $.extend(true, {}, VisualBase.capabilities, {
         }, buildObjects()),
     });
 
+export default capabilities;
+log('Attribute Slicer Capabilities: ', capabilities);
+
 function buildObjects() {
     "use strict";
     const objects = {};
@@ -72,8 +76,9 @@ function buildObjects() {
         Object.keys(props).forEach(propName => {
             if (propName === "displayName") {
                 objProps[propName] = props[propName];
+            } else {
+                objProps.properties[propName] = props[propName];
             }
-            objProps.properties[propName] = props[propName];
         });
     });
     return objects;
