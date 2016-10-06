@@ -1,25 +1,22 @@
 /* tslint:disable */
 import {
     logger,
-    updateTypeGetter,
-    UpdateType,
     PropertyPersister,
     createPropertyPersister,
+    UpdateType, 
+    updateTypeGetter,
+    Visual,
+    VisualBase,
 } from "essex.powerbi.base";
-import { isStateEqual } from "../Utils";
-import { buildPersistObjectsFromState, buildStateFromPowerBI } from "./stateConversion";
-import { buildSelfFilter } from "./expressions";
-import { publishReplace, publishChange, StatefulVisual, IDimensions } from "pbi-stateful";
-import converter from "./dataConversion";
-import capabilities from "./AttributeSlicerVisual.capabilities";
-import { createValueFormatter } from "./formatting";
+import { 
+    publishReplace, 
+    publishChange, 
+    StatefulVisual, 
+    IDimensions,
+} from "pbi-stateful";
 
-import { default as createPersistObjectBuilder } from "./persistence";
-import { ListItem, SlicerItem, SETTING_DESCRIPTORS } from "./interfaces";
-import { IAttributeSlicerState } from "../interfaces";
-import { AttributeSlicer as AttributeSlicerImpl } from "../AttributeSlicer";
-import { VisualBase, Visual } from "essex.powerbi.base";
 import * as _ from "lodash";
+const ldget = require("lodash.get");
 import IVisualHostServices = powerbi.IVisualHostServices;
 import DataView = powerbi.DataView;
 import data = powerbi.data;
@@ -27,13 +24,37 @@ import VisualObjectInstance = powerbi.VisualObjectInstance;
 import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInstancesOptions;
 import PixelConverter = jsCommon.PixelConverter;
 
+import { isStateEqual } from "../Utils";
+import { buildPersistObjectsFromState, buildStateFromPowerBI } from "./stateConversion";
+import { buildSelfFilter } from "./expressions";
+import converter from "./dataConversion";
+import capabilities from "./AttributeSlicerVisual.capabilities";
+import { createValueFormatter } from "./formatting";
+import { default as createPersistObjectBuilder } from "./persistence";
+import { ListItem, SlicerItem, SETTING_DESCRIPTORS } from "./interfaces";
+import { IAttributeSlicerState } from "../interfaces";
+import { AttributeSlicer as AttributeSlicerImpl } from "../AttributeSlicer";
 const log = logger("essex.widget.AttributeSlicerVisual");
 const CUSTOM_CSS_MODULE = require("!css!sass!./css/AttributeSlicerVisual.scss");
-const ldget = require("lodash.get");
+
 /* tslint:enable */
 
 // PBI Swallows these
 const EVENTS_TO_IGNORE = "mousedown mouseup click focus blur input pointerdown pointerup touchstart touchmove touchdown";
+
+function hashString(input: string): number {
+  "use strict";
+  let hash = 0;
+  if (input.length === 0) {
+    return hash;
+  }
+  for (let i = 0, len = input.length; i < len; i++) {
+    const chr   = input.charCodeAt(i);
+    hash  = ((hash << 5) - hash) + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return hash;
+}
 
 @Visual(require("../build").output.PowerBI)
 export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerState> {
@@ -105,7 +126,7 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         }
 
         // HACK: PowerBI Swallows these events unless we prevent propagation upwards
-        this.element.on(EVENTS_TO_IGNORE, (e) => e.stopPropagation());
+        this.element.on(EVENTS_TO_IGNORE, (e: any) => e.stopPropagation());
     }
 
     /**
@@ -135,8 +156,6 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         mySlicer.showSearchBox = false;
         this.mySlicer = mySlicer;
         this.mySlicer.dimensions = this.dimensions;
-
-        log("Loading Custom Sandbox: ", this.sandboxed);
     }
 
     /**
@@ -233,6 +252,14 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         if (this.mySlicer) {
             this.mySlicer.destroy();
         }
+    }
+
+    public areEqual(state1: IAttributeSlicerState, state2: IAttributeSlicerState): boolean {
+        return _.isEqual(state1, state2);
+    }
+
+    public getHashCode(state: IAttributeSlicerState): number {
+        return hashString(JSON.stringify(state));
     }
 
     /**

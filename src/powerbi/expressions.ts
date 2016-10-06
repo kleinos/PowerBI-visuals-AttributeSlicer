@@ -15,7 +15,7 @@ export function buildSelfFilter(dataView: powerbi.DataView, searchText: string) 
         if (searchText) {
             if (sourceType.text) {
                 let containsTextExpr = data.SQExprBuilder.text(searchText);
-                filterExpr = data.SQExprBuilder.contains(<any>source.expr, containsTextExpr);
+                filterExpr = data.SQExprBuilder.contains(<any>source["expr"], containsTextExpr);
             } else {
                 let rightExpr: data.SQExpr;
                 if (sourceType.numeric) {
@@ -24,7 +24,7 @@ export function buildSelfFilter(dataView: powerbi.DataView, searchText: string) 
                     rightExpr = data.SQExprBuilder.boolean(searchText === "1" || searchText === "true");
                 }
                 if (rightExpr) {
-                    filterExpr = data.SQExprBuilder.equal(<any>source.expr, rightExpr);
+                    filterExpr = data.SQExprBuilder.equal(<any>source["expr"], rightExpr);
                 }
             }
         }

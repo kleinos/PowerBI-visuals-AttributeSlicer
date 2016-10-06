@@ -25,10 +25,10 @@ export function createCategoryFormatter(dataView: powerbi.DataView) {
         let max: Date;
         cats[0].values.forEach(n => {
             if (typeof min === "undefined" || min > n) {
-                min = n;
+                min = new Date(n.valueOf());
             }
             if (typeof max === "undefined" || max < n) {
-                max = n;
+                max = new Date(n.valueOf());
             }
         });
         if (min && max) {

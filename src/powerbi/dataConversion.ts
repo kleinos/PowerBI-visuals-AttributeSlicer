@@ -34,8 +34,10 @@ export default function converter(
             let sections: any;
             if (values) {
                 sections = values.map((v, j) => {
-                    const value = v.values[catIdx];
-                    total += value;
+                    const value = v.values[catIdx].valueOf();
+                    if (typeof value === "number") {
+                        total += <number>value;
+                    }
                     return {
                         color: colors[j] || "#ccc",
                         value: value,
@@ -49,7 +51,7 @@ export default function converter(
             }
             const item =
                 createItem(
-                    categoryFormatter ? categoryFormatter.format(category) : category,
+                    categoryFormatter ? categoryFormatter.format(category) : `${category.valueOf()}`,
                     total,
                     id.getKey(),
                     id.getSelector(),
