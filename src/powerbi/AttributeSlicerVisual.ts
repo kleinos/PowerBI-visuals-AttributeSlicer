@@ -200,7 +200,6 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
                 // Tell the slicer to repaint
                 this.mySlicer.refresh();
             }
-
             this.writeStateToPBI(state);
         }
     }
@@ -350,8 +349,8 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
     private _onSelectionChangedDebounced = _.debounce( /* tslint:enable */
         (selectedItems: ListItem[]) => {
             log("onSelectionChanged");
-            const selection = selectedItems.map(n => n.match).join(",");
-            const text = selection && selection.length ? `Selected ${selection}` : "Cleared Selection";
+            const selection = selectedItems.map(n => n.match).join(", ");
+            const text = selection && selection.length ? `Select ${selection}` : "Clear Selection";
             const newState = this.generateState();
             publishChange(this, text, newState);
             this.writeStateToPBI(newState);
@@ -372,7 +371,7 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
      */
     private onSearchPerformed(searchText: string) {
         if (!this.isHandlingSetState) {
-            const text = searchText && searchText.length ? `Searched for "${searchText}"` : "Cleared Search";
+            const text = searchText && searchText.length ? `Search for "${searchText}"` : "Clear Search";
             publishChange(this, text, this.generateState());
         }
     }
@@ -420,8 +419,7 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
      */
     private writeStateToPBI(state: IAttributeSlicerState) {
         log("AttributeSlicer loading state into PBI", state);
-
-        if (this.host) {
+        if (state && this.host) {
             // Stolen from PBI's timeline
             this.propertyPersister.persist(true, buildPersistObjectsFromState(this.dataView, state));
         }
