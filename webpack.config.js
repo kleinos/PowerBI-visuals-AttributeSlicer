@@ -4,7 +4,6 @@ const webpack = require('webpack');
 module.exports = {
     devtool: 'eval',
     resolve: {
-        // Add `.ts` and `.tsx` as a resolvable extension.
         extensions: ['', '.webpack.js', '.web.js', '.js', '.json']
     },
     module: {
@@ -24,12 +23,19 @@ module.exports = {
         ],
     },
     externals: {
-        "jsdom": ""
+        jquery: "jQuery",
+        d3: "d3",
+        underscore: "_",
+        "lodash": "_",
+        "powerbi-visuals/lib/powerbi-visuals": "powerbi",
     },
     plugins: [
         new webpack.optimize.OccurenceOrderPlugin(),
         new webpack.ProvidePlugin({
             'Promise': 'exports?global.Promise!es6-promise'
+        }),
+        new webpack.DefinePlugin({
+            'process.env.DEBUG': "\"" + (process.env.DEBUG || "") + "\""
         })
     ],
 };
