@@ -5,7 +5,8 @@ import DataView = powerbi.DataView;
 import { createValueFormatter, createCategoryFormatter } from "./formatting";
 
 /* tslint:disable */
-const colors = require("essex.powerbi.base/src/colors").full;
+const { colors } = require("essex.powerbi.base");
+const { full } = colors;
 /* tslint:enable */
 
 /**

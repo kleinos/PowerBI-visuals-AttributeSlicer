@@ -3,15 +3,15 @@ import {
     logger,
     PropertyPersister,
     createPropertyPersister,
-    UpdateType, 
+    UpdateType,
     updateTypeGetter,
     Visual,
     VisualBase,
 } from "essex.powerbi.base";
-import { 
-    publishReplace, 
-    publishChange, 
-    StatefulVisual, 
+import {
+    publishReplace,
+    publishChange,
+    StatefulVisual,
     IDimensions,
 } from "pbi-stateful";
 
@@ -255,7 +255,9 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
     }
 
     public areEqual(state1: IAttributeSlicerState, state2: IAttributeSlicerState): boolean {
-        return _.isEqual(state1, state2);
+        const result = _.isEqual(state1, state2);
+        log("areEqual?::%s", result, state1, state2);
+        return result;
     }
 
     public getHashCode(state: IAttributeSlicerState): number {
