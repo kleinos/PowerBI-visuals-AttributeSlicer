@@ -1,19 +1,19 @@
 /* tslint:disable */
-import {
-    logger,
-    PropertyPersister,
-    createPropertyPersister,
-    UpdateType,
-    updateTypeGetter,
-    Visual,
-    VisualBase,
-} from "essex.powerbi.base";
+import { logger } from "essex.powerbi.base/dist/lib/utils/logger";
+import PropertyPersister from "essex.powerbi.base/dist/lib/utils/PropertyPersister";
+import createPropertyPersister from "essex.powerbi.base/dist/lib/utils/createPropertyPersister";
+import Visual from "essex.powerbi.base/dist/lib/utils/Visual";
+import UpdateType from "essex.powerbi.base/dist/lib/utils/UpdateType";
+import { receiveUpdateType } from "essex.powerbi.base/dist/lib/Utils/receiveUpdateType";
+
 import {
     publishReplace,
     publishChange,
+} from "pbi-stateful/src/stateful";
+import { 
     StatefulVisual,
     IDimensions,
-} from "pbi-stateful";
+} from "pbi-stateful/src/StatefulVisual";
 
 import * as _ from "lodash";
 const ldget = require("lodash.get");
@@ -113,12 +113,7 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
      * Constructor
      */
     constructor(noCss = false) {
-        super(noCss, "Attribute Slicer");
-
-        this["updateType"] = updateTypeGetter(this);
-
-        // Tell base we should not load sandboxed
-        VisualBase.DEFAULT_SANDBOX_ENABLED = false;
+        super("Attribute Slicer", noCss);
 
         const className = CUSTOM_CSS_MODULE && CUSTOM_CSS_MODULE.locals && CUSTOM_CSS_MODULE.locals.className;
         if (className) {
@@ -226,12 +221,13 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
     /**
      * Enumerates the instances for the objects that appear in the power bi panel
      */
-    public enumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions): VisualObjectInstance[] {
+    protected handleEnumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions): powerbi.VisualObjectInstanceEnumeration {
+        super.handleEnumerateObjectInstances(options);
         let instances = super.enumerateObjectInstances(options) || [{
             /*tslint:disable */selector: null/* tslint:enable */,
             objectName: options.objectName,
             properties: {},
-        }, ];
+        }, ] as VisualObjectInstance[];
         const instance = instances[0];
         const props = instance.properties;
         const state = this.state;

@@ -6,6 +6,9 @@ module.exports = {
     resolve: {
         extensions: ['', '.webpack.js', '.web.js', '.js', '.json']
     },
+    resolveLoader: {
+        fallback: [path.join(__dirname, 'node_modules')],
+    },
     module: {
         loaders: [
             {

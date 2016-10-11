@@ -1,9 +1,9 @@
-import { VisualBase } from "essex.powerbi.base";
+import VisualBase from "essex.powerbi.base/dist/lib/VisualBase";
 import VisualDataRoleKind = powerbi.VisualDataRoleKind;
 import { SETTING_DESCRIPTORS } from "./interfaces";
 import { DATA_WINDOW_SIZE } from "./AttributeSlicerVisual.defaults";
 import data = powerbi.data;
-const log = require('debug')('AttributeSlicer::Capabilities');
+const log = require("debug")("AttributeSlicer::Capabilities"); // tslint:disable-line
 
 const capabilities = $.extend(true, {}, VisualBase.capabilities, {
         dataRoles: [
@@ -63,7 +63,7 @@ const capabilities = $.extend(true, {}, VisualBase.capabilities, {
     });
 
 export default capabilities;
-log('Attribute Slicer Capabilities: ', capabilities);
+log("Attribute Slicer Capabilities: ", capabilities);
 
 function buildObjects() {
     "use strict";
