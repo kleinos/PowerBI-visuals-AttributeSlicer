@@ -34,6 +34,7 @@ import { IAttributeSlicerState } from "../interfaces";
 import { AttributeSlicer as AttributeSlicerImpl } from "../AttributeSlicer";
 const log = logger("essex.widget.AttributeSlicerVisual");
 const CUSTOM_CSS_MODULE = require("!css!sass!./css/AttributeSlicerVisual.scss");
+const stringify = require("json-stringify-safe");
 
 /* tslint:enable */
 
@@ -254,7 +255,7 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
     }
 
     public getHashCode(state: IAttributeSlicerState): number {
-        return hashString(JSON.stringify(state));
+        return hashString(stringify(state));
     }
 
     /**

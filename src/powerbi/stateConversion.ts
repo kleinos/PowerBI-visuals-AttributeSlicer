@@ -9,6 +9,7 @@ import data = powerbi.data;
 import SelectionId = powerbi.visuals.SelectionId;
 import { DEFAULT_VALUE_WIDTH, DEFAULT_TEXT_SIZE } from "../AttributeSlicer.defaults";
 import PixelConverter = jsCommon.PixelConverter;
+const stringify = require("json-stringify-safe");
 /* tslint:disable */
 const ldget = require("lodash.get");
 /* tslint:enable */
@@ -126,7 +127,7 @@ export function buildPersistObjectsFromState(dataView: powerbi.DataView, state: 
     const filter = buildSelectionFilter(state);
     let selection: any = undefined;
     if (filter) {
-        selection = JSON.stringify(state.selectedItems.map(n => {
+        selection = stringify(state.selectedItems.map(n => {
             return {
                 match: n.match,
                 value: n.value,

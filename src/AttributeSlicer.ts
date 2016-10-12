@@ -197,7 +197,6 @@ export class AttributeSlicer {
      * Loads our state from the given state
      */
     public set state(state: IAttributeSlicerState) {
-        log("Load State: ", JSON.stringify(state));
         this.loadingState = true;
         state = _.merge({}, _.cloneDeep(DEFAULT_STATE), state);
         const settings = state.settings;
