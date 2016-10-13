@@ -25,7 +25,7 @@
 import { VisualBase } from "essex.powerbi.base";
 import VisualDataRoleKind = powerbi.VisualDataRoleKind;
 import StandardObjectProperties = powerbi.visuals.StandardObjectProperties;
-import { DATA_WINDOW_SIZE } from "./AttributeSlicerVisual.defaults";
+import { DATA_WINDOW_SIZE } from "./defaults";
 
 export default $.extend(true, {}, VisualBase.capabilities, {
         dataRoles: [

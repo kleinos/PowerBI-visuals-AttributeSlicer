@@ -1,0 +1,33 @@
+@import "../../../node_modules/essex.powerbi.base/css/main";
+@import "../../../node_modules/essex.powerbi.base/css/variables";
+@import "../../style/slicer.scss";
+
+body {
+    padding: 0;
+    margin: 0;
+    overflow: hidden;    
+}
+
+:local(.className) {
+    .attribute-slicer {
+        font-family: $semilightFontFamily;
+        font-size: $smallFontSize;
+    }
+
+    .value-display {
+        background-color: $dataColor1;
+    }
+
+    .item:hover {
+        background-color: $neutralTertiaryAltColor;
+    }
+
+    .token {
+        background-color: $neutralLightColor;
+    }
+
+    .searchbox {
+        border: 1px solid #999;
+        padding-left: 2px;
+    }
+}
