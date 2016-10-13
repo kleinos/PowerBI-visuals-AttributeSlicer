@@ -59,7 +59,8 @@ const config = module.exports = {
             'Promise': 'exports?global.Promise!es6-promise'
         }),
         new webpack.DefinePlugin({
-            'process.env.DEBUG': "\"" + (process.env.DEBUG || "") + "\""
+            'process.env.DEBUG': "\"" + (process.env.DEBUG || "") + "\"",
+            'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
         })
     ],
 };

@@ -10,20 +10,20 @@ export default class AttributeSlicerItem extends React.Component<any, any> {
         const { match, matchPrefix, matchSuffix, sections, renderedValue } = this.props.item as SlicerItem;
         const sizes = this.props.sizes as { category: number; value: number };
         const categoryStyle = {
-            "display": "inline-block",
-            "overflow": "hidden",
-            "maxWidth": sizes.category + "%"
+            display: "inline-block",
+            overflow: "hidden",
+            maxWidth: sizes.category + "%",
         };
         return (
-            <div style={{ "whiteSpace": "nowrap", "cursor":"pointer" }} className="item">
-                <div style={{ "marginLeft": "5px", "verticalAlign": "middle", "height": "100%" }} className="display-container">
+            <div className="item">
+                <div className="display-container">
                     <span style={categoryStyle} title="${pretty(match)}" className="category-container">
                         <span className="matchPrefix">{pretty(matchPrefix)}</span>
                         <span className="match">{pretty(match)}</span>
                         <span className="matchSuffix">{pretty(matchSuffix)}</span>
                     </span>
-                    <span style={{ display:"inline-block", "maxWidth": sizes.value + "%", height: "100%" }} className="value-container">
-                        <span style={{ display:"inline-block", width: renderedValue + "%", height: "100%" }}>
+                    <span style={{ display: "inline-block", maxWidth: sizes.value + "%", height: "100%" }} className="value-container">
+                        <span style={{ display: "inline-block", width: renderedValue + "%", height: "100%" }}>
                         {
                             (sections || []).map(s => {
                                 let color = s.color || "";
@@ -32,7 +32,7 @@ export default class AttributeSlicerItem extends React.Component<any, any> {
                                     display: "inline-block",
                                     width: s.width + "%",
                                     backgroundColor: color,
-                                    height: "100%"
+                                    height: "100%",
                                 };
                                 return (
                                     <span style={{style}} title={displayValue} className="value-display">
