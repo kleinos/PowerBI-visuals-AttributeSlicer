@@ -11,7 +11,6 @@ import {
     publishChange,
 } from "pbi-stateful/src/stateful";
 import { StatefulVisual } from "pbi-stateful/src/StatefulVisual";
-import { receiveDimensions, IDimensions } from "essex.powerbi.base/dist/lib/Utils/receiveDimensions";
 
 import * as _ from "lodash";
 const ldget = require("lodash.get");
@@ -149,12 +148,14 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         // Hide the searchbox by default
         mySlicer.showSearchBox = false;
         this.mySlicer = mySlicer;
+
+        this.setDimensions(options.viewport);
     }
 
     /**
      * Called when the dimensions of the visual have changed
      */
-    public setDimensions(value: IDimensions) {
+    public setDimensions(value: {width: number, height: number}) {
         if (this.mySlicer) {
             this.mySlicer.dimensions = value;
         }
@@ -167,8 +168,8 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         log("Update", options);
 
         // Make sure the slicer has some sort of dimensions
-        if (!this.mySlicer.dimensions) {
-            this.mySlicer.dimensions = options.viewport;
+        if (options.viewport) {
+            this.setDimensions(options.viewport);
         }
 
         const dv = this.dataView = options.dataViews && options.dataViews[0];
