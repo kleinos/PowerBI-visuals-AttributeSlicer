@@ -34,26 +34,11 @@ import { IAttributeSlicerState } from "../interfaces";
 import { AttributeSlicer as AttributeSlicerImpl } from "../AttributeSlicer";
 const log = logger("essex.widget.AttributeSlicerVisual");
 const CUSTOM_CSS_MODULE = require("!css!sass!./css/AttributeSlicerVisual.scss");
-const stringify = require("json-stringify-safe");
 
 /* tslint:enable */
 
 // PBI Swallows these
 const EVENTS_TO_IGNORE = "mousedown mouseup click focus blur input pointerdown pointerup touchstart touchmove touchdown";
-
-function hashString(input: string): number {
-  "use strict";
-  let hash = 0;
-  if (input.length === 0) {
-    return hash;
-  }
-  for (let i = 0, len = input.length; i < len; i++) {
-    const chr   = input.charCodeAt(i);
-    hash  = ((hash << 5) - hash) + chr;
-    hash |= 0; // Convert to 32bit integer
-  }
-  return hash;
-}
 
 @Visual(require("../build").output.PowerBI)
 @receiveDimensions
@@ -236,16 +221,6 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         if (this.mySlicer) {
             this.mySlicer.destroy();
         }
-    }
-
-    public areEqual(state1: IAttributeSlicerState, state2: IAttributeSlicerState): boolean {
-        const result = _.isEqual(state1, state2);
-        log("areEqual?::%s", result, state1, state2);
-        return result;
-    }
-
-    public getHashCode(state: IAttributeSlicerState): number {
-        return hashString(stringify(state));
     }
 
     /**
