@@ -24,8 +24,9 @@
 
 import { VisualBase } from "essex.powerbi.base";
 import VisualDataRoleKind = powerbi.VisualDataRoleKind;
-import StandardObjectProperties = powerbi.visuals.StandardObjectProperties;
 import { DATA_WINDOW_SIZE } from "./defaults";
+import Settings from "./settings";
+import { buildCapabilitiesObjects } from "../../lib/settings";
 
 export default $.extend(true, {}, VisualBase.capabilities, {
         dataRoles: [
@@ -56,7 +57,7 @@ export default $.extend(true, {}, VisualBase.capabilities, {
         sorting: {
             default: {}
         },
-        objects: {
+        objects: $.extend(true, {
             general: {
                 displayName: "General",
                 properties: {
@@ -69,18 +70,8 @@ export default $.extend(true, {}, VisualBase.capabilities, {
                             },
                         },
                     },
-                    // formatString: StandardObjectProperties.formatString,
                     selection: {
-                        type: { text: {} }
-                    },
-                    textSize: {
-                        displayName: "Text Size",
-                        type: { numeric: true },
-                    },
-                    showOptions: {
-                        displayName: "Show Options",
-                        description: "Should the search box and other options be shown",
-                        type: { bool: true },
+                        type: { text: {} },
                     },
                     selfFilter: {
                         type: { filter: { selfFilter: true } }
@@ -90,54 +81,5 @@ export default $.extend(true, {}, VisualBase.capabilities, {
                     },
                 },
             },
-            display: {
-                displayName: "Display",
-                properties: {
-                    valueColumnWidth: {
-                        displayName: "Value Width %",
-                        description: "The percentage of the width that the value column should take up.",
-                        type: { numeric: true },
-                    },
-                    horizontal: {
-                        displayName: "Horizontal",
-                        description: "Display the attributes horizontally, rather than vertically",
-                        type: { bool: true },
-                    },
-                    labelDisplayUnits: StandardObjectProperties.labelDisplayUnits,
-                    labelPrecision: StandardObjectProperties.labelPrecision,
-                },
-            },
-            selection: {
-                displayName: "Selection",
-                properties: {
-                    brushMode: {
-                        displayName: "Brush Mode",
-                        description: "Allow for the drag selecting of attributes",
-                        type: { bool: true },
-                    },
-                    singleSelect: {
-                        displayName: "Single Select",
-                        description: "Only allow for a single selected",
-                        type: { bool: true },
-                    },
-                    showSelections: {
-                        displayName: "Use Tokens",
-                        description: "Will show the selected attributes as tokens",
-                        type: { bool: true },
-                    },
-                },
-            },
-            /*,
-            sorting: {
-                displayName: "Sorting",
-                properties: {
-                    byHistogram: {
-                        type: { bool: true }
-                    },
-                    byName: {
-                        type: { bool: true }
-                    }
-                }
-            }*/
-        },
+        }, buildCapabilitiesObjects(Settings)),
     });

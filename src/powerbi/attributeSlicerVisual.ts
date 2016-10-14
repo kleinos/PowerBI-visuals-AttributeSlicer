@@ -2,7 +2,10 @@ import AttributeSlicerVisualPresenter from "./presenter";
 import { Visual, VisualBase } from "essex.powerbi.base";
 import capabilities from "./capabilities";
 import dataConversion from "./data";
-import { SlicerItem } from "../interfaces";
+import { buildEnumerationObjects, parseSettingsFromPBI } from "../../lib/settings";
+import Settings from "./settings";
+
+const ldget = require("lodash/get"); //tslint:disable-line
 
 /**
  * Wrapper around attribute slicer for PowerBI
@@ -14,6 +17,11 @@ export default class AttributeSlicerVisual extends VisualBase {
      * The capabilities for this visual
      */
     public static capabilities = capabilities;
+
+    /**
+     * The current set of settings
+     */
+    private currentSettings: Settings;
 
     /**
      * My presenter
@@ -50,9 +58,29 @@ export default class AttributeSlicerVisual extends VisualBase {
 
         this.myPresenter.update(options);
 
+        if (options.dataViews && options.dataViews.length) {
+            this.currentSettings = parseSettingsFromPBI(options, Settings);
+        }
+
         this.myPresenter.props = {
             data: dataConversion(options.dataViews && options.dataViews[0]),
             dimensions: options.viewport,
         };
+    }
+
+    /**
+     * Enumerates the PBI setting values
+     */
+    public enumerateObjectInstances(options: powerbi.EnumerateVisualObjectInstancesOptions): powerbi.VisualObjectInstance[] {
+        const { objectName } = options;
+        let instances = super.enumerateObjectInstances(options) || [{
+            /*tslint:disable */selector: null/* tslint:enable */,
+            objectName: objectName,
+            properties: {},
+        }] as powerbi.VisualObjectInstance[];
+
+        $.extend(true, instances[0], buildEnumerationObjects(this.currentSettings, objectName)[0]);
+
+        return instances;
     }
 }
