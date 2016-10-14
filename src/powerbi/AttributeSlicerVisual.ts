@@ -5,7 +5,7 @@ import createPropertyPersister from "essex.powerbi.base/dist/lib/utils/createPro
 import Visual from "essex.powerbi.base/dist/lib/utils/Visual";
 import UpdateType from "essex.powerbi.base/dist/lib/utils/UpdateType";
 import { receiveUpdateType } from "essex.powerbi.base/dist/lib/Utils/receiveUpdateType";
-
+import { IDimensions, receiveDimensions, IReceiveDimensions } from "essex.powerbi.base/dist/lib/Utils/receiveDimensions";
 import {
     publishReplace,
     publishChange,
@@ -55,6 +55,7 @@ function hashString(input: string): number {
 }
 
 @Visual(require("../build").output.PowerBI)
+@receiveDimensions
 export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerState> {
 
     /**
@@ -148,8 +149,6 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
         // Hide the searchbox by default
         mySlicer.showSearchBox = false;
         this.mySlicer = mySlicer;
-
-        this.setDimensions(options.viewport);
     }
 
     /**
@@ -166,12 +165,6 @@ export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerStat
      */
     public onUpdate(options: powerbi.VisualUpdateOptions, updateType: UpdateType) {
         log("Update", options);
-
-        // Make sure the slicer has some sort of dimensions
-        if (options.viewport) {
-            this.setDimensions(options.viewport);
-        }
-
         const dv = this.dataView = options.dataViews && options.dataViews[0];
         const newState = buildStateFromPowerBI(dv);
         this.onUpdateLoadData(updateType, dv, newState);
