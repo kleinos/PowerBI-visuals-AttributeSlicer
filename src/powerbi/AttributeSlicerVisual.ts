@@ -1,5 +1,6 @@
 /* tslint:disable */
 import { logger } from "essex.powerbi.base/dist/lib/utils/logger";
+import { capabilities } from "essex.powerbi.base/dist/lib/utils/capabilities";
 import PropertyPersister from "essex.powerbi.base/dist/lib/utils/PropertyPersister";
 import createPropertyPersister from "essex.powerbi.base/dist/lib/utils/createPropertyPersister";
 import Visual from "essex.powerbi.base/dist/lib/utils/Visual";
@@ -25,7 +26,7 @@ import { isStateEqual } from "../Utils";
 import { buildPersistObjectsFromState, buildStateFromPowerBI } from "./stateConversion";
 import { buildSelfFilter } from "./expressions";
 import converter from "./dataConversion";
-import capabilities from "./AttributeSlicerVisual.capabilities";
+import capabilitiesData from "./AttributeSlicerVisual.capabilities";
 import { createValueFormatter } from "./formatting";
 import { default as createPersistObjectBuilder } from "./persistence";
 import { ListItem, SlicerItem, SETTING_DESCRIPTORS } from "./interfaces";
@@ -56,13 +57,8 @@ function hashString(input: string): number {
 
 @Visual(require("../build").output.PowerBI)
 @receiveDimensions
+@capabilities(capabilitiesData)
 export default class AttributeSlicer extends StatefulVisual<IAttributeSlicerState> {
-
-    /**
-     * The set of capabilities for the visual
-     */
-    public static capabilities = capabilities;
-
     /**
      * My AttributeSlicer
      */
