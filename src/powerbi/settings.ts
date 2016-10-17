@@ -25,7 +25,7 @@ export default class AttributeSlicerPowerBISettings implements ISlicerState {
             const dv = ldget(options, "dataViews[0]");
             const isSelfFilterEnabled = ldget(dv, "metadata.objects.general.selfFilterEnabled", false);
             return doesDataSupportSearch(dv) && !isSelfFilterEnabled;
-        }
+        },
     })
     public showSearch: boolean;
 

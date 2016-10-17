@@ -32,14 +32,14 @@ export default function setting(config: ISettingDescriptor) {
 /**
  * Parses settings from powerbi dataview objects
  */
-export function parseSettingsFromPBI<T>(options: powerbi.VisualUpdateOptions, ctor: { new (): T }): T {
+export function parseSettingsFromPBI<T>(options: powerbi.VisualUpdateOptions, ctor: { new (): T }, dataViewIdx = 0): T {
     "use strict";
     const settingsMetadata = getSettingsMetadata(ctor);
     if (settingsMetadata) {
         const newSettings = new ctor();
         Object.keys(settingsMetadata).forEach(n => {
             const setting = settingsMetadata[n];
-            const adapted = convertValueFromPBI(setting, options);
+            const adapted = convertValueFromPBI(setting, options, dataViewIdx);
             newSettings[setting.propertyName] = adapted.adaptedValue;
         });
         return newSettings;
@@ -194,9 +194,9 @@ function convertValueToPBI(obj: any, setting: ISetting, includeHidden: boolean =
 /**
  * Converts the value for the given setting in PBI to a regular setting value
  */
-function convertValueFromPBI(setting: ISetting, options: powerbi.VisualUpdateOptions) {
+function convertValueFromPBI(setting: ISetting, options: powerbi.VisualUpdateOptions, dataViewIdx = 0) {
     "use strict";
-    const objects: powerbi.DataViewObjects = ldget(options, "dataViews[0].metadata.objects");
+    const objects: powerbi.DataViewObjects = ldget(options, `dataViews[${dataViewIdx}].metadata.objects`);
     const { descriptor, descriptor: { category, defaultValue, parse }, propertyName } = setting;
     const { objName, propName } = getPBIObjectNameAndPropertyName(setting);
     let value = ldget(objects, `${objName}.${propName}`, defaultValue);
