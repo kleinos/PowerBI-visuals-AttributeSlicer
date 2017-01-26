@@ -68,6 +68,7 @@ describe("AttributeSlicer", () => {
         let result = {
             instance: new AttributeSlicer(ele, {
                 searchDebounce: 0,
+                listUpdateDebounce: 0,
             }, vList),
             element: ele,
             vlist: vList,
@@ -736,7 +737,7 @@ describe("AttributeSlicer", () => {
         it ("setting should update the value of 'selectedItems'", () => {
             const { instance } = createInstance();
             instance.state = <any>{ selectedItems: TEST_SELECTED_ITEMS.slice(0) };
-            expect(instance.selectedItems.map(n => ({ id: n.id }))).to.be.deep.equal(TEST_SELECTED_ITEMS);
+            expect(instance.selectedItems.map((n: any) => ({ id: n.id }))).to.be.deep.equal(TEST_SELECTED_ITEMS);
         });
         it ("setting should return the value of 'selectedItems'", () => {
             const { instance } = createInstance();
@@ -787,6 +788,23 @@ describe("AttributeSlicer", () => {
                     .val("TEST_SEARCH")
                     .trigger("input");
             });
+        });
+        it("should not attempt to resize the list after it has been destroyed, Issue #28", (done) => {
+            const { instance, element, vlist } = createInstance();
+
+            // Set this to undefined to force a crash if slicer tries to call it
+            vlist.setHeight = undefined;
+
+            // Destroy the instance
+            instance.destroy();
+
+            // This forces a list update
+            instance.dimensions = { width: 3000, height: 3000 };
+
+            // Delay til after the update list debounce is called
+            setTimeout(function() {
+                done();
+            }, 10); // 10 - longer than the update delay
         });
     });
 

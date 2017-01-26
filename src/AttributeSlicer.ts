@@ -125,28 +125,34 @@ export class AttributeSlicer {
     private searchDebounce = SEARCH_DEBOUNCE;
 
     /**
+     * Whether or not this slicer is destroyed
+     */
+    private destroyed = false;
+
+    /**
      * Updates the list height
      */
-    private updateListHeight = _.debounce(() => {
-        if (this.dimensions) {
-            let height = (this.dimensions.height - (this.listEle.offset().top - this.element.offset().top)) - 2;
-            let width: number|string = "100%";
-            this.listEle.css({ width: width, height: height });
-                // .attr("dir", dir);
-            this.virtualList.setHeight(height);
-            this.virtualList.setDir(this.renderHorizontal);
-        }
-    }, 50);
+    private updateListHeight: () => void;
 
     /**
      * Constructor for the advanced slicer
      */
-    constructor(element: JQuery, config?: { searchDebounce?: number }, vlist?: any) {
+    constructor(element: JQuery, config?: { searchDebounce?: number; listUpdateDebounce: number; }, vlist?: any) {
         this.element = element;
         this.showSelections = true;
         this.slicerEle = element.append($(AttributeSlicer.template)).find(".advanced-slicer");
         this.listEle = this.slicerEle.find(".list");
         this.searchDebounce = ldget(config, "searchDebounce", SEARCH_DEBOUNCE);
+        this.updateListHeight = _.debounce(() => {
+            if (!this.destroyed && this.dimensions) {
+                let height = (this.dimensions.height - (this.listEle.offset().top - this.element.offset().top)) - 2;
+                let width: number|string = "100%";
+                this.listEle.css({ width: width, height: height });
+                    // .attr("dir", dir);
+                this.virtualList.setHeight(height);
+                this.virtualList.setDir(this.renderHorizontal);
+            }
+        }, ldget(config, "listUpdateDebounce", 50));
         this.virtualList = vlist || new VirtualList({
             itemHeight: this.fontSize * 2,
             afterRender: () => this.selectionManager.refresh(),
@@ -645,6 +651,7 @@ export class AttributeSlicer {
      * Destroys this attribute slicer
      */
     public destroy() {
+        this.destroyed = true;
         if (this.selectionManager) {
             this.selectionManager.destroy();
         }
